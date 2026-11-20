@@ -8,8 +8,7 @@ Style: identical to docs/architecture/RealBasket_Docker_Compose_*.pptx - same NT
 
 Time plan (6:00): cover 0:15 · problem 0:30 · architecture 1:00 · demo dashboard 1:15 · demo search + chat 1:30 ·
 demo monitoring 0:30 · source code 0:30 · summary 0:30.
-The German deck additionally contains the start-up slide as a HIDDEN slide (not shown in the slide show);
-the English deck has none - start-up instructions live in the README.
+Neither deck has a start-up slide - start-up instructions live in the README only.
 """
 
 from __future__ import annotations
@@ -19,9 +18,8 @@ from pathlib import Path
 
 from pptx import Presentation
 from pptx.dml.color import RGBColor
-from pptx.enum.shapes import MSO_SHAPE
 from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
-from pptx.util import Inches, Pt
+from pptx.util import Inches
 
 HERE = Path(__file__).resolve().parent
 ARCH = HERE.parent / "docs" / "architecture" / "build_docker_decks.py"
@@ -103,32 +101,6 @@ def step(slide, s: dict) -> None:
     key_bar(slide, s["bar"])
 
 
-def startup(slide, s: dict) -> None:
-    """Five PowerShell windows side by side."""
-    colors = [SKY, NAVY, DEEP, BLUE, GREEN]
-    w, gap, y = 2.33, 0.217, 1.45
-    for i, (name, port, items) in enumerate(s["windows"]):
-        x = 0.41 + i * (w + gap)
-        head = box(slide, x, y, w, 0.8, colors[i])
-        tf = head.text_frame
-        tf.vertical_anchor = MSO_ANCHOR.MIDDLE
-        para(tf, name, 13, WHITE, True, first=True, align=PP_ALIGN.CENTER, space_after=0)
-        para(tf, port, 10, WHITE, align=PP_ALIGN.CENTER, space_after=0)
-        body = box(slide, x, y + 0.85, w, 2.95, PALE)
-        for j, item in enumerate(items):
-            para(body.text_frame, "• " + item, 10.5, SLATE, first=j == 0, space_after=5)
-        if i < 4:
-            arrow = slide.shapes.add_shape(MSO_SHAPE.RIGHT_ARROW, Inches(x + w + 0.01), Inches(y + 0.28),
-                                           Inches(gap - 0.02), Inches(0.24))
-            arrow.fill.solid()
-            arrow.fill.fore_color.rgb = GREEN
-            arrow.line.fill.background()
-    tip = box(slide, 0.41, 5.35, 12.52, 0.5, PALE, line=SKY)
-    tip.text_frame.vertical_anchor = MSO_ANCHOR.MIDDLE
-    para(tip.text_frame, s["tip"], 11, SLATE, first=True, align=PP_ALIGN.CENTER, space_after=0)
-    key_bar(slide, s["bar"])
-
-
 def code(slide, s: dict) -> None:
     """Three real code excerpts (left) + why they matter (right)."""
     y, x, w = 1.4, 0.41, 8.55
@@ -156,10 +128,6 @@ def code(slide, s: dict) -> None:
 
 def notes(slide, text: str) -> None:
     slide.notes_slide.notes_text_frame.text = text.strip()
-
-
-def hide(slide) -> None:
-    slide._element.set("show", "0")
 
 
 # --- content ------------------------------------------------------------------------------------------------
@@ -206,23 +174,6 @@ Zeit: 1:00. Auf das Diagramm zeigen, von links nach rechts.
 "Der MCP-Server ist das Herzstück: Er stellt die Tools bereit – Index-Berechnung, VPI-Vergleich, Einflussfaktoren – und liest die Werte aus einer SQLite-Datenbank, in der zu jedem Wert Datei und Seite gespeichert sind."
 "Weaviate ist unsere Vektordatenbank. Dort liegen nur die Texte der PDFs, also Methodenhinweise. Zahlen kommen nie aus der Textsuche."
 "Grundsatz: Der Agent wählt die Tools und formuliert die Antwort, die Zahlen entstehen nur im deterministischen Code."
-"""},
-            {"kind": "startup", "hidden": True, "title": "Start der Demo: fünf PowerShell-Fenster",
-             "windows": [
-                 ("Fenster 1", "Weaviate :8080", ["wsl --shutdown", "podman run im WSL-VM", "Image von mirror.gcr.io", "Fenster offen lassen"]),
-                 ("Fenster 2", "MCP-Server :8001", [".env laden", "storage --mode sql", "storage --mode vector", "real-basket-mcp"]),
-                 ("Fenster 3", "Agent-API :8002", [".env laden", "uvicorn agent_service.api:app", "Port 8002"]),
-                 ("Fenster 4", "UI :8501", ["streamlit run src/real_basket/ui/app.py"]),
-                 ("Fenster 5", "Prüfung", ["/health → status ok", "search_documents → 200", "localhost:8501 öffnen"]),
-             ],
-             "tip": "Alle Befehle stehen im README, Abschnitt \"Start for the presentation\".",
-             "bar": "Reihenfolge einhalten: Weaviate → MCP → Agent-API → UI → Prüfung.",
-             "notes": """
-AUSGEBLENDETE FOLIE – wird in der Bildschirmpräsentation nicht gezeigt (nur als Spickzettel für den Start vor dem Vortrag).
-Falls etwas hakt:
-- "Agent API not reachable": Fenster 3 läuft nicht.
-- "machine not in running state": wsl --shutdown, Fenster 1 neu starten.
-- PDF-Suche schlägt fehl: Weaviate prüfen, storage --mode vector erneut ausführen.
 """},
             {"kind": "step", "title": "Live-Demo 1 · Dashboard: ECLI gegenüber VPI und Einflussfaktoren",
              "kpis": [("2,93 %", "ECLI ggü. Vorjahr (10/2026)"), ("2,83 %", "VPI ggü. Vorjahr"),
@@ -469,7 +420,7 @@ Possible questions:
     },
 }
 
-RENDER = {"arch": deck.architecture, "startup": startup, "results": deck.results, "code": code, "step": step}
+RENDER = {"arch": deck.architecture, "results": deck.results, "code": code, "step": step}
 
 
 def build(lang: str) -> Path:
@@ -485,8 +436,6 @@ def build(lang: str) -> Path:
         slide = deck.content_slide(prs, s["title"], footer)
         RENDER[s["kind"]](slide, s)
         notes(slide, s["notes"])
-        if s.get("hidden"):
-            hide(slide)
     prs.core_properties.title = f"{t['cover_title']} – {t['cover_subtitle']}"
     prs.core_properties.language = "de-DE" if lang == "de" else "en-US"
     out = HERE / t["file"]

@@ -122,20 +122,6 @@ AZURE_COMPLETION_MODEL=gpt-4o
 
 > Windows: if `poetry` is not on PATH, use `& "$env:APPDATA\Python\Scripts\poetry.exe"` instead.
 
-### Eclipse (optional)
-
-All files are **UTF-8** (German umlauts, emoji in the UI). `.settings/org.eclipse.core.resources.prefs` and
-`.editorconfig` preset UTF-8. If umlauts show up as two odd characters (e.g. an A with tilde instead of ü) in Eclipse, the project still uses the Windows code page:
-**Project → Properties → Resource → Text file encoding → Other: UTF-8**, then refresh. Saving a file in that state
-breaks it - `tests/test_encoding.py` catches such files.
-
-1. **File → Import… → General → Existing Projects into Workspace**, select the repo folder, leave
-   "Copy projects into workspace" unchecked.
-2. Install **PyDev** (Eclipse Marketplace), add the Poetry virtualenv interpreter
-   (`poetry env info --path` → `Scripts\python.exe`) under **Preferences → PyDev → Interpreters**.
-3. Right-click the project → **PyDev → Set as PyDev Project**, add `/real-basket/src` to the PYTHONPATH.
-4. Start Streamlit from a terminal (no Eclipse launcher).
-
 ## Start for the presentation (Windows + Podman, 5 PowerShell windows)
 
 The app consists of four processes: **Weaviate** (vector DB, Podman), **MCP server** (port 8001),
