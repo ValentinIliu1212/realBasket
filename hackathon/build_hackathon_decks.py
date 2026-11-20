@@ -1,7 +1,9 @@
-"""Build the RealBasket hackathon demo decks (German + English) for a 6-minute slot, with speaker notes.
+"""Build the RealBasket hackathon demo deck (English) for a 6-minute slot, with speaker notes.
 
 Run (from the repo root):  poetry run python hackathon/build_hackathon_decks.py
-Output (next to this script): RealBasket_Hackathon_Demo_DE.pptx, RealBasket_Hackathon_Demo_EN.pptx
+Output (next to this script): RealBasket_Hackathon_Demo_EN.pptx only.
+The German deck (RealBasket_Hackathon_Demo_DE.pptx) is maintained by hand outside the repo, so this script
+never builds or overwrites it; its texts in TEXT["de"] are kept for reference (`build("de")` still works).
 
 Style: identical to docs/architecture/RealBasket_Docker_Compose_*.pptx - same NTT DATA template, cover, layout
 "B_Title Only", footer, colours and drawing helpers (imported from docs/architecture/build_docker_decks.py).
@@ -444,5 +446,4 @@ def build(lang: str) -> Path:
 
 
 if __name__ == "__main__":
-    for language in TEXT:
-        print("written", build(language))
+    print("written", build("en"))   # English only - the German deck is maintained by hand
