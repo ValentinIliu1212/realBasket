@@ -1,0 +1,12 @@
+# All sources are UTF-8 (German umlauts, emoji in the Streamlit UI). Editors that default to the Windows code page
+# (cp1252) otherwise show "Ã¼" instead of "ü" - and may save the file broken.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.{bat,ps1}]
+end_of_line = crlf

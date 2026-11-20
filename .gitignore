@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.venv/
+.env
+.pytest_cache/
+.ruff_cache/
+dist/
+sessions/
+.streamlit/secrets.toml
+.pydevproject
+/reports/*
+!/reports/real-data/
+/data_store/

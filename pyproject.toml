@@ -1,0 +1,49 @@
+[project]
+name = "real-basket"
+version = "0.1.0"
+description = "RealBasket - agentic essential-living-cost inflation index compared with the official CPI"
+readme = "README.md"
+requires-python = ">=3.11,<4.0"
+dependencies = [
+    "strands-agents[openai] (>=1.0.0,<2.0.0)",
+    "streamlit (>=1.40.0,<2.0.0)",
+    "pandas (>=2.2.0,<3.0.0)",
+    "plotly (>=5.24.0,<7.0.0)",
+    "pydantic (>=2.8.0,<3.0.0)",
+    "pydantic-settings (>=2.0.0,<3.0.0)",
+    "python-dotenv (>=1.0.0,<2.0.0)",
+    "httpx (>=0.27.0,<1.0.0)",
+    "fastapi (>=0.115.0,<1.0.0)",
+    "uvicorn (>=0.30.0,<1.0.0)",
+    "reportlab (>=4.2,<5.0)",
+    "pypdf (>=5.0,<7.0)",
+    "mcp (>=1.9,<2.0)",
+    "weaviate-client (>=4.16,<5.0)",
+    "langchain-weaviate (>=0.0.4,<2.0)",
+    "langchain-openai (>=0.3,<2.0)"
+]
+
+[tool.poetry]
+packages = [{include = "real_basket", from = "src"}]
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.0"
+ruff = "^0.6.0"
+python-pptx = "^1.0.2"
+
+[tool.poetry.scripts]
+real-basket-cli = "real_basket.cli:main"
+real-basket-pdf = "real_basket.reports.pdf_report:main"
+real-basket-knowledge = "real_basket.knowledge.search:main"
+real-basket-mcp = "real_basket.mcp_server.server:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 110
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"

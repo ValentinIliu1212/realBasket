@@ -1,0 +1,93 @@
+name: realbasket
+services:
+  weaviate:
+    image: cr.weaviate.io/semitechnologies/weaviate:1.32.3
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:50051:50051"
+    environment:
+      QUERY_DEFAULTS_LIMIT: "25"
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: "true"
+      PERSISTENCE_DATA_PATH: /var/lib/weaviate
+      DEFAULT_VECTORIZER_MODULE: none
+      ENABLE_MODULES: ""
+      CLUSTER_HOSTNAME: node1
+    volumes:
+      - weaviate_data:/var/lib/weaviate
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8080/v1/.well-known/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+
+  realbasket-mcp:
+    build: .
+    restart: unless-stopped
+    command: ["sh", "/app/docker/mcp-entrypoint.sh"]
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      MCP_HOST: "0.0.0.0"
+      MCP_PORT: "8001"
+      REALBASKET_SQLITE_PATH: /app/data_store/realbasket.sqlite3
+      KNOWLEDGE_DIR: /app/reports/real-data
+      WEAVIATE_HOST: weaviate
+      WEAVIATE_HTTP_PORT: "8080"
+      WEAVIATE_GRPC_PORT: "50051"
+      REALBASKET_AUTO_INDEX_VECTOR: ${REALBASKET_AUTO_INDEX_VECTOR:-false}
+    ports:
+      - "127.0.0.1:8001:8001"
+    volumes:
+      - realbasket_data:/app/data_store
+      - ./reports/real-data:/app/reports/real-data:ro
+    depends_on:
+      weaviate:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; s=socket.create_connection(('127.0.0.1',8001),3); s.close()"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+
+  realbasket-agent:
+    build: .
+    restart: unless-stopped
+    command: ["uvicorn", "real_basket.agent_service.api:app", "--host", "0.0.0.0", "--port", "8002"]
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      REALBASKET_MCP_URL: http://realbasket-mcp:8001/mcp
+      REALBASKET_AGENT_PORT: "8002"
+    # Only the UI uses this internal API; no host port is published.
+    expose:
+      - "8002"
+    depends_on:
+      realbasket-mcp:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8002/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+
+  realbasket-ui:
+    build: .
+    restart: unless-stopped
+    command: ["streamlit", "run", "src/real_basket/ui/app.py", "--server.address", "0.0.0.0", "--server.port", "8501", "--server.headless", "true"]
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      REALBASKET_AGENT_URL: http://realbasket-agent:8002
+    ports:
+      - "127.0.0.1:8501:8501"
+    depends_on:
+      realbasket-agent:
+        condition: service_healthy
+
+volumes:
+  weaviate_data:
+  realbasket_data:
