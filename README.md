@@ -16,6 +16,9 @@ baskets of goods and different weightings.
 
 ## Demo in 3 minutes
 
+> First start all services as described in
+> [Start for the presentation](#start-for-the-presentation-windows--podman-5-powershell-windows).
+
 1. `poetry run streamlit run src/real_basket/ui/app.py` → the header shows essential inflation, VPI, the
    deviation and its **biggest driver** ("Größter Einflussfaktor") at a glance (real data 10/2026: 2,93 % vs. 2,83 %, +0,11 PP, driver
    Verkehr / Mobilität). The expander **Datenprüfung** lists the 11 re-checks of the PDF import.
@@ -98,14 +101,95 @@ src/real_basket/
 Requirements: Python ≥ 3.11, [Poetry](https://python-poetry.org/) ≥ 2.0, an OpenAI API key (only for the agent).
 
 ```powershell
-git clone https://github.com/ValentinIliu1212/real-basket.git
-cd real-basket
+git clone https://github.com/ValentinIliu1212/realBasket.git
+cd realBasket
 poetry install
-copy .env.example .env   # add your own OPENAI_API_KEY
 poetry run pytest
 ```
 
+Create a `.env` in the repo root (git-ignored, never commit it):
+
+```dotenv
+OPENAI_API_KEY=
+OPENAI_MODEL_ID=gpt-4o-mini
+OPENAI_API_TYPE=azure
+OPENAI_API_VERSION=2024-02-15-preview
+AZURE_OPENAI_ENDPOINT=https://<your-resource>.openai.azure.com/
+AZURE_OPENAI_API_KEY=<your-key>
+AZURE_EMBEDDING_MODEL=text-embedding-3-large
+AZURE_COMPLETION_MODEL=gpt-4o
+```
+
 > Windows: if `poetry` is not on PATH, use `& "$env:APPDATA\Python\Scripts\poetry.exe"` instead.
+
+## Start for the presentation (Windows + Podman, 5 PowerShell windows)
+
+The app consists of four processes: **Weaviate** (vector DB, Podman), **MCP server** (port 8001),
+**Agent API** (port 8002) and the **Streamlit UI** (port 8501). The UI only talks to the Agent API; if
+that is not running, the UI shows *"RealBasket Agent API not reachable (http://127.0.0.1:8002)"*.
+
+Open five PowerShell windows and keep all of them open. Every window except window 1 starts in the repo root:
+
+```powershell
+cd C:\Users\EILIUVACT\eclipse-workspace\realBasket
+```
+
+**Window 1 - Weaviate (ports 8080 / 50051)**
+
+```powershell
+# Stop leftovers from earlier runs and reset WSL (avoids the Podman ssh port conflict)
+Get-NetTCPConnection -LocalPort 8001,8002,8501 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
+Remove-Item Env:DOCKER_HOST -ErrorAction SilentlyContinue
+wsl --shutdown
+
+# Run Weaviate in the foreground inside the Podman VM (keeps the VM alive; ports are forwarded to Windows)
+wsl -d podman-machine-default -u root -- sh -c "podman rm -f realbasket-weaviate >/dev/null 2>&1; exec podman run --rm --name realbasket-weaviate -p 8080:8080 -p 50051:50051 -e QUERY_DEFAULTS_LIMIT=25 -e AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED=true -e PERSISTENCE_DATA_PATH=/var/lib/weaviate -e DEFAULT_VECTORIZER_MODULE=none -e ENABLE_MODULES= -e CLUSTER_HOSTNAME=node1 -v realbasket_weaviate_data:/var/lib/weaviate mirror.gcr.io/semitechnologies/weaviate:1.32.3"
+```
+
+**Window 2 - load data + MCP server (port 8001)**
+
+```powershell
+(Invoke-WebRequest -UseBasicParsing http://127.0.0.1:8080/v1/.well-known/ready).StatusCode   # expect 200
+Get-Content .env | Where-Object { $_ -match '^\s*[A-Z_]+=' } | ForEach-Object { $k,$v = $_ -split '=',2; Set-Item "Env:$($k.Trim())" $v.Trim() }
+poetry run python -m real_basket.storage --mode sql
+poetry run python -m real_basket.storage --mode vector   # once; the Weaviate volume keeps the index
+poetry run real-basket-mcp --transport streamable-http
+```
+
+**Window 3 - Agent API (port 8002)**
+
+```powershell
+Get-Content .env | Where-Object { $_ -match '^\s*[A-Z_]+=' } | ForEach-Object { $k,$v = $_ -split '=',2; Set-Item "Env:$($k.Trim())" $v.Trim() }
+poetry run uvicorn real_basket.agent_service.api:app --host 127.0.0.1 --port 8002
+```
+
+**Window 4 - Streamlit UI (port 8501)**
+
+```powershell
+poetry run streamlit run src/real_basket/ui/app.py
+```
+
+**Window 5 - smoke test, then open http://localhost:8501**
+
+```powershell
+(Invoke-WebRequest -UseBasicParsing http://127.0.0.1:8002/health).Content   # {"status":"ok","service":"realbasket-agent"}
+Invoke-WebRequest -UseBasicParsing -Method Post -ContentType 'application/json' -Body '{"arguments":{"query":"Miete"}}' http://127.0.0.1:8002/tools/search_documents | Select-Object StatusCode
+```
+
+Stop: `Ctrl+C` in windows 4, 3, 2 and 1.
+
+Troubleshooting:
+
+| Symptom | Cause / fix |
+|---------|-------------|
+| `Agent API not reachable (http://127.0.0.1:8002)` | Window 3 not running |
+| `machine not in running state` / `dial tcp 127.0.0.1:<port>` | Stale WSL relay holds the Podman ssh port: `wsl --shutdown`, restart window 1 |
+| `toomanyrequests: ... pull rate limit` | Docker Hub limit; use the `mirror.gcr.io/...` image as above |
+| Document search fails | Weaviate not ready or vector index missing: check window 1, rerun `--mode vector` |
+| `podman compose` finds no provider | Not needed - the steps above use plain `podman` |
+
+> With Docker Desktop instead of Podman, the whole stack also starts with `docker compose up --build -d`
+> (see `docker-compose.yml`).
 
 ### Eclipse (optional)
 
