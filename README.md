@@ -122,6 +122,20 @@ AZURE_COMPLETION_MODEL=gpt-4o
 
 > Windows: if `poetry` is not on PATH, use `& "$env:APPDATA\Python\Scripts\poetry.exe"` instead.
 
+### Eclipse (optional)
+
+All files are **UTF-8** (German umlauts, emoji in the UI). `.settings/org.eclipse.core.resources.prefs` and
+`.editorconfig` preset UTF-8. If umlauts show up as two odd characters (e.g. an A with tilde instead of ü) in Eclipse, the project still uses the Windows code page:
+**Project → Properties → Resource → Text file encoding → Other: UTF-8**, then refresh. Saving a file in that state
+breaks it - `tests/test_encoding.py` catches such files.
+
+1. **File → Import… → General → Existing Projects into Workspace**, select the repo folder, leave
+   "Copy projects into workspace" unchecked.
+2. Install **PyDev** (Eclipse Marketplace), add the Poetry virtualenv interpreter
+   (`poetry env info --path` → `Scripts\python.exe`) under **Preferences → PyDev → Interpreters**.
+3. Right-click the project → **PyDev → Set as PyDev Project**, add `/real-basket/src` to the PYTHONPATH.
+4. Start Streamlit from a terminal (no Eclipse launcher).
+
 ## Start for the presentation (Windows + Podman, 5 PowerShell windows)
 
 The app consists of four processes: **Weaviate** (vector DB, Podman), **MCP server** (port 8001),
@@ -191,19 +205,19 @@ Troubleshooting:
 > With Docker Desktop instead of Podman, the whole stack also starts with `docker compose up --build -d`
 > (see `docker-compose.yml`).
 
-### Eclipse (optional)
+### Start on a colleague's laptop (TODO)
 
-All files are **UTF-8** (German umlauts, emoji in the UI). `.settings/org.eclipse.core.resources.prefs` and
-`.editorconfig` preset UTF-8. If umlauts show up as two odd characters (e.g. an A with tilde instead of ü) in Eclipse, the project still uses the Windows code page:
-**Project → Properties → Resource → Text file encoding → Other: UTF-8**, then refresh. Saving a file in that state
-breaks it - `tests/test_encoding.py` catches such files.
-
-1. **File → Import… → General → Existing Projects into Workspace**, select the repo folder, leave
-   "Copy projects into workspace" unchecked.
-2. Install **PyDev** (Eclipse Marketplace), add the Poetry virtualenv interpreter
-   (`poetry env info --path` → `Scripts\python.exe`) under **Preferences → PyDev → Interpreters**.
-3. Right-click the project → **PyDev → Set as PyDev Project**, add `/real-basket/src` to the PYTHONPATH.
-4. Start Streamlit from a terminal (no Eclipse launcher).
+> **TODO:** the configuration of the colleague's laptop is not known yet. Fill in once checked:
+>
+> - [ ] Container runtime: Docker Desktop or Podman? (`docker --version` / `podman --version`)
+> - [ ] With Docker Desktop: try the one-liner `docker compose up --build -d`, then open http://localhost:8501
+> - [ ] With Podman: does `podman machine start` work, is WSL2 enabled (`wsl --status`)?
+> - [ ] Python >= 3.11 and Poetry >= 2.0 installed? (`python --version`, `poetry --version`)
+> - [ ] Ports 8001, 8002, 8080, 8501 and 50051 free on 127.0.0.1? (`Get-NetTCPConnection -LocalPort <port>`)
+> - [ ] VPN / proxy: can the laptop reach the Azure OpenAI endpoint and `mirror.gcr.io`?
+> - [ ] PowerShell profile: no stray `DOCKER_HOST` set (`$env:DOCKER_HOST` should be empty for Podman)
+> - [ ] `.env` with the Azure OpenAI settings copied to the repo root (never commit it)
+> - [ ] Document the exact start sequence that worked here
 
 ## Usage
 
