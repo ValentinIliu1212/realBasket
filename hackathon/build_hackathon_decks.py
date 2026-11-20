@@ -40,7 +40,7 @@ CODE = [
     ("src/real_basket/mcp_server/server.py", [
         "@mcp.tool()",
         "def calculate_index(months: int = 24) -> dict:",
-        '    """Calculate inflation vs CPI using the existing deterministic engine and validated PDFs."""',
+        '    """Calculate inflation vs CPI with the deterministic engine on the validated SQLite dataset."""',
         "    from real_basket.agents.tools import calculate_essential_vs_cpi",
         "    return calculate_essential_vs_cpi(months=months)",
     ]),
@@ -158,20 +158,20 @@ Zeit: 0:30.
 Kernbotschaft: Der VPI ist korrekt, misst aber einen anderen, breiteren Warenkorb.
 "Viele Menschen haben das Gefühl, dass die Inflation höher ist als die offizielle Zahl – weil sie vor allem Grundbedarf wahrnehmen: Lebensmittel, Miete, Energie, Mobilität."
 "RealBasket baut genau dafür einen eigenen Index – den ECLI, Essential Living Cost Index – mit fünf Kategorien."
-"Wichtig: keine erfundenen Demo-Daten. Alle Werte stammen aus Referenz-PDFs auf Basis von Destatis-Daten und werden beim Einlesen 11-fach geprüft."
+"Wichtig: keine erfundenen Demo-Daten. Alle Werte stammen aus Referenz-PDFs auf Basis von Destatis-Daten, werden beim Import 11-fach geprüft und in SQLite gespeichert – zur Laufzeit liest die App nur noch aus SQLite."
 """},
             {"kind": "arch", "title": "Architektur: vier Dienste mit Docker Compose",
              "s2_side_head": "Auf einen Blick", "s2_side": [
                  "UI (Streamlit :8501) spricht nur mit der Agent-API",
                  "Agent-API (FastAPI :8002): Strands-Agent + LLM, Zahlen-Guardrail",
-                 "MCP-Server (:8001): Rechenkern, SQLite mit Quelle und Seite",
+                 "MCP-Server (:8001): Rechenkern, Daten nur aus SQLite",
                  "Weaviate (:8080): Vektorsuche in den PDF-Texten",
                  "Zahlen nie aus RAG oder LLM – nur aus dem Rechenkern"],
              "notes": """
 Zeit: 1:00. Auf das Diagramm zeigen, von links nach rechts.
 "Die App besteht aus vier Diensten. Ganz links die Streamlit-Oberfläche. Sie greift nie direkt auf Daten zu, sondern ruft ausschließlich die Agent-API auf."
 "Die Agent-API enthält einen Strands-Agenten mit Azure OpenAI. Für feste Dashboard-Abfragen leitet sie Anfragen über eine Allow-List direkt an den MCP-Server weiter – ohne LLM."
-"Der MCP-Server ist das Herzstück: Er stellt die Tools bereit – Index-Berechnung, VPI-Vergleich, Einflussfaktoren – und liest die Werte aus einer SQLite-Datenbank, in der zu jedem Wert Datei und Seite gespeichert sind."
+"Der MCP-Server ist das Herzstück: Er stellt die Tools bereit – Index-Berechnung, VPI-Vergleich, Einflussfaktoren – und liest die Werte aus einer SQLite-Datenbank, in der zu jedem Wert Datei und Seite gespeichert sind. Die PDFs werden nur beim Import gelesen und dabei elfmal geprüft."
 "Weaviate ist unsere Vektordatenbank. Dort liegen nur die Texte der PDFs, also Methodenhinweise. Zahlen kommen nie aus der Textsuche."
 "Grundsatz: Der Agent wählt die Tools und formuliert die Antwort, die Zahlen entstehen nur im deterministischen Code."
 """},
@@ -250,7 +250,7 @@ Zeit: 0:30.
 """},
             {"kind": "results", "title": "Zusammenfassung und nächste Schritte",
              "kpis": [("2,93 % vs. 2,83 %", "ECLI vs. VPI – Abweichung +0,11 PP"),
-                      ("130", "automatisierte Tests grün"),
+                      ("138", "automatisierte Tests grün"),
                       ("0", "Kennzahlen vom LLM – alle aus dem Rechenkern")],
              "done_head": "Was RealBasket zeigt", "done": [
                  "Grundbedarfsinflation auf echten Daten, erklärt nach Kategorien",
@@ -266,11 +266,11 @@ Zeit: 0:30.
                  "Vielen Dank – Fragen?"],
              "notes": """
 Zeit: 0:30.
-"Zusammengefasst: RealBasket misst die Inflation der Grundbedarfskosten auf echten Daten und erklärt die Abweichung zum VPI nach Kategorien. Der Agent wählt die Tools selbst, rechnet aber nie selbst. Der Guardrail prüft jede Zahl, RAG liefert Erklärungen mit Quelle, und das Monitoring macht jeden Schritt sichtbar – abgesichert durch 130 automatisierte Tests."
+"Zusammengefasst: RealBasket misst die Inflation der Grundbedarfskosten auf echten Daten und erklärt die Abweichung zum VPI nach Kategorien. Der Agent wählt die Tools selbst, rechnet aber nie selbst. Der Guardrail prüft jede Zahl, RAG liefert Erklärungen mit Quelle, und das Monitoring macht jeden Schritt sichtbar – abgesichert durch 138 automatisierte Tests."
 "Vielen Dank – wir freuen uns auf Ihre Fragen."
 Mögliche Fragen:
 - Warum nicht das LLM rechnen lassen? → Nachvollziehbarkeit und Korrektheit; LLMs halluzinieren Zahlen.
-- Woher kommen die Daten? → Referenz-PDFs auf Basis Destatis EVS 2023 + VPI, 11/2024 – 10/2026.
+- Woher kommen die Daten? → Referenz-PDFs auf Basis Destatis EVS 2023 + VPI, 11/2024 – 10/2026; einmal importiert und geprüft, dann nur aus SQLite gelesen.
 - Warum MCP? → Standardisierte Tool-Schnittstelle; Agent und Daten sind entkoppelt und einzeln deploybar.
 """},
         ],
@@ -278,7 +278,7 @@ Mögliche Fragen:
     "en": {
         "file": "RealBasket_Hackathon_Demo_EN.pptx",
         "cover_title": "RealBasket",
-        "cover_subtitle": "Hackathon demo – What does living really cost?",
+        "cover_subtitle": "What is the real cost of living?",
         "cover_notes": """
 Time: 0:15 (total 6:00 – plan: title 0:15 · problem 0:30 · architecture 1:00 · demo dashboard 1:15 · demo search + chat 1:30 · monitoring 0:30 · code 0:30 · summary 0:30).
 "Hello everyone. We are team RealBasket. We will show you live how an agentic AI system measures real essential living costs and compares them with the official Consumer Price Index."
@@ -301,20 +301,20 @@ Time: 0:30.
 Key message: the CPI is correct, but it measures a different, broader basket.
 "Many people feel that inflation is higher than the official figure – because they mainly notice essential spending: food, rent, energy, mobility."
 "RealBasket builds its own index for exactly that – the ECLI, Essential Living Cost Index – with five categories."
-"Important: no made-up demo data. All values come from reference PDFs based on Destatis data and are checked 11 times on import."
+"Important: no made-up demo data. All values come from reference PDFs based on Destatis data, are checked 11 times on import and stored in SQLite – at runtime the app reads only from SQLite."
 """},
             {"kind": "arch", "title": "Architecture: four services with Docker Compose",
              "s2_side_head": "At a glance", "s2_side": [
                  "UI (Streamlit :8501) talks only to the agent API",
                  "Agent API (FastAPI :8002): Strands agent + LLM, number guardrail",
-                 "MCP server (:8001): calculation core, SQLite with source and page",
+                 "MCP server (:8001): calculation core, data only from SQLite",
                  "Weaviate (:8080): vector search over the PDF text",
                  "Figures never from RAG or the LLM – only from the core"],
              "notes": """
 Time: 1:00. Point at the diagram, left to right.
 "The app consists of four services. On the left, the Streamlit UI. It never reads data directly; it only calls the agent API."
 "The agent API contains a Strands agent with Azure OpenAI. For fixed dashboard queries it forwards requests through an allow-list straight to the MCP server – no LLM involved."
-"The MCP server is the heart of the system: it provides the tools – index calculation, CPI comparison, deviation drivers – and reads values from a SQLite database that stores file and page for every value."
+"The MCP server is the heart of the system: it provides the tools – index calculation, CPI comparison, deviation drivers – and reads values from a SQLite database that stores file and page for every value. The PDFs are read only by the import, which checks them eleven times."
 "Weaviate is our vector database. It only holds the text of the PDFs, i.e. method notes. Figures never come from text search."
 "Principle: the agent picks the tools and writes the answer; the figures are produced by deterministic code only."
 """},
@@ -393,7 +393,7 @@ Time: 0:30.
 """},
             {"kind": "results", "title": "Summary and next steps",
              "kpis": [("2.93 % vs. 2.83 %", "ECLI vs. CPI – deviation +0.11 PP"),
-                      ("130", "automated tests passing"),
+                      ("138", "automated tests passing"),
                       ("0", "figures from the LLM – all from the calculation core")],
              "done_head": "What RealBasket shows", "done": [
                  "Essential-cost inflation on real data, explained by category",
@@ -409,11 +409,11 @@ Time: 0:30.
                  "Thank you – questions?"],
              "notes": """
 Time: 0:30.
-"In summary: RealBasket measures essential-cost inflation on real data and explains the deviation from the CPI by category. The agent picks the tools itself but never calculates itself. The guardrail checks every figure, RAG provides explanations with sources, and monitoring makes every step visible – backed by 130 automated tests."
+"In summary: RealBasket measures essential-cost inflation on real data and explains the deviation from the CPI by category. The agent picks the tools itself but never calculates itself. The guardrail checks every figure, RAG provides explanations with sources, and monitoring makes every step visible – backed by 138 automated tests."
 "Thank you – we look forward to your questions."
 Possible questions:
 - Why not let the LLM calculate? → Traceability and correctness; LLMs hallucinate numbers.
-- Where does the data come from? → Reference PDFs based on Destatis EVS 2023 + CPI, 11/2024 – 10/2026.
+- Where does the data come from? → Reference PDFs based on Destatis EVS 2023 + CPI, 11/2024 – 10/2026; imported and checked once, then read only from SQLite.
 - Why MCP? → Standardised tool interface; agent and data are decoupled and deployable separately.
 """},
         ],

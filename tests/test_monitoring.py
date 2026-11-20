@@ -30,7 +30,8 @@ def test_ui_tool_trace_passes_the_agent_api_allow_list():
     t = mon.ui_tool_trace("get_dashboard_snapshot", {}, 0.2, result_info="11 Prüfungen")
     path = [(s.source, s.target) for s in t.steps]
     assert path[:4] == [("user", "ui"), ("ui", "api_client"), ("api_client", "agent_api"), ("agent_api", "mcp_client")]
-    assert ("mcp_dashboard", "core") in path and ("data", "pdfs") in path
+    assert ("mcp_dashboard", "core") in path and ("data", "sqlite") in path
+    assert ("data", "pdfs") not in path                             # PDFs are only read by the import
     assert t.status == "ok" and "gecacht" in t.note
     assert not any(s.target == "llm" for s in t.steps)              # deterministic: no LLM involved
 

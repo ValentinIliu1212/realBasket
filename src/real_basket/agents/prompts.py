@@ -16,7 +16,7 @@ ORCHESTRATOR_PROMPT = f"""
 You are the RealBasket Analyst, an economic analysis agent.
 Goal: compare an essential living cost index with the official German Consumer Price Index (VPI, Destatis).
 
-Data: REAL data only, parsed deterministically from the reference PDFs (ECLI model calculation: fixed monthly
+Data: REAL data only, imported and validated from the reference PDFs (ECLI model calculation: fixed monthly
 basket of Destatis EVS 2023 expenditure, groups Lebensmittel, Wohnen / Energie, Verkehr, Gesundheit,
 Kommunikation, updated with official price indices, 11/2024–10/2026; VPI rebased to Nov 2024 = 100; asking rents
 of the 15 largest cities, immowelt, Jan vs. Oct 2026). There is no synthetic or demo data.

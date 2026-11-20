@@ -16,3 +16,5 @@ sessions/
 .project
 .classpath
 .metadata/
+# Office lock files
+~$*

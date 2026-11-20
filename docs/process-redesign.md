@@ -17,8 +17,8 @@
     in code (sums, gaps, printed ECLI and yearly rates reproduced by the engine, consistency across reports, city
     rents, federal-state coverage).
   - *Prose → method notes (RAG)*: context and caveats only, never figures.
-- **Real data only:** there is no synthetic demo data and no fallback. If the PDFs are missing or unreadable,
-  `load_basket()` raises `RealDataError`; the dashboard shows the error and every tool returns `{"error": …}`.
+- **Real data only:** there is no synthetic demo data and no fallback. If the SQLite import is missing
+  (PDFs missing, unreadable or a check failed), `load_basket()` raises `RealDataError`; the dashboard shows the error and every tool returns `{"error": …}`.
   Untouched weight sliders use the exact (unrounded) basket weights, so dashboard, agent and printed ECLI agree.
 - **No invented figures:** the sources contain no rent per federal state and no net salaries. The agent and the
   dashboard say so and show only which cities of a state have published rents.
@@ -35,8 +35,9 @@ flowchart TD
     O --> COL["collect_category_prices<br/>→ REALBASKET-COLLECTOR (agent) → fetch_prices"]
     O --> K["search_methodology<br/>(RAG: knowledge/, BM25 / embeddings)"]
     K --> PDF[("reports/real-data/*.pdf<br/>method notes, caveats")]
-    C & I & R & COL --> B[("load_basket()<br/>real data: PDF tables, re-checked<br/>no fallback")]
-    B --> PDF
+    C & I & R & COL --> B[("load_basket()<br/>validated dataset from SQLite<br/>no fallback")]
+    B --> DB[("SQLite<br/>imported from the PDF tables, 11 checks")]
+    DB -. import only .-> PDF
     C & I & R & COL & K --> A(["Answer (German): headline + max. 5 bullets,<br/>data basis, citations [Datei S. N], disclaimer"])
 ```
 

@@ -4,11 +4,11 @@ This extends the existing Strands/Streamlit project **without replacing** its cu
 
 ## Architecture
 
-PDFs (`reports/real-data/*.pdf`) → existing validated parser → **SQLite** (EUR observations, source PDF, page, modelled/observed provenance) → `get_observations` MCP tool.
+PDFs (`reports/real-data/*.pdf`) → validated parser (11 checks, import only) → **SQLite** (validated dataset = single read source of all figures, plus EUR observations with source PDF, page, modelled/observed provenance) → `load_basket()` / all calculation tools and the `get_observations` MCP tool.
 
 PDFs → existing text-only chunker → OpenAI/Azure embeddings → **WeaviateVectorStore** → `search_documents` MCP tool (retrieval and citations, **not numeric calculations**).
 
-The **existing** `calculate_essential_vs_cpi` and index engine remain authoritative. MCP simply wraps them.
+The **existing** `calculate_essential_vs_cpi` and index engine remain authoritative; they read their inputs from SQLite. MCP simply wraps them.
 
 ### Local startup
 
@@ -48,7 +48,7 @@ Example MCP tool calls: `ingest_reference_pdfs`, `index_pdf_knowledge`, `get_obs
 * The vector index intentionally excludes numeric table cells. Citation search is separate from arithmetic.
 * The document index is rebuilt by `index_pdf_knowledge` on demand. Changing PDFs requires re-running the ingestion steps.
 * For use beyond localhost, protect the MCP endpoint with authentication and HTTPS, and configure Weaviate authentication. The sample Compose enables anonymous access but binds ports to loopback only.
-* Original PDFs are retained on disk as the source of truth. SQLite is not a substitute for immutable source storage in production.
+* Original PDFs are retained on disk as the immutable source and are read only by the import; SQLite is the runtime read source. Re-run `python -m real_basket.storage --mode sql` after PDF changes (or to rebuild a lost database).
 
 ### Project additions
 

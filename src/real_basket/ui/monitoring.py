@@ -52,7 +52,7 @@ NODES: dict[str, Node] = {n.id: n for n in [
     Node("mcp_storage", "SQLite-Tools\ningest_reference_pdfs\nget_observations", "mcp"),
     Node("mcp_vector", "Vektor-Tools\nsearch_documents\nindex_pdf_knowledge", "mcp"),
     Node("core", "core/\nindex.py · investigation.py", "mcp"),
-    Node("data", "data/\nreal_data.py · basket.py", "mcp"),
+    Node("data", "data/\nbasket.py (liest SQLite)\nreal_data.py (nur Import)", "mcp"),
     Node("reports", "reports/pdf_report.py", "mcp"),
     Node("sqlite", "SQLite\ndata_store/realbasket.sqlite3", "mcp"),
     Node("pdfs", "Referenz-PDFs\nreports/real-data (read-only)", "mcp"),
@@ -67,20 +67,21 @@ ARCH_EDGES: list[tuple[str, str]] = [
     ("agent_api", "mcp_client"), ("agent_api", "guardrail"), ("orchestrator", "llm"), ("orchestrator", "mcp_client"),
     ("mcp_client", "mcp_dashboard"), ("mcp_client", "mcp_data"), ("mcp_client", "mcp_storage"),
     ("mcp_client", "mcp_vector"), ("mcp_dashboard", "core"), ("mcp_dashboard", "reports"), ("mcp_dashboard", "pdfs"),
-    ("mcp_data", "core"), ("core", "data"), ("reports", "data"), ("data", "pdfs"), ("mcp_storage", "data"),
+    ("mcp_data", "core"), ("core", "data"), ("reports", "data"), ("data", "sqlite"), ("data", "pdfs"),
+    ("mcp_storage", "data"),
     ("mcp_storage", "sqlite"), ("mcp_vector", "embedding"), ("mcp_vector", "weaviate"), ("mcp_vector", "pdfs"),
 ]
 
 # MCP tool -> hops behind the MCP client (tool group first)
 TOOL_HOPS: dict[str, list[tuple[str, str]]] = {
-    "get_dashboard_snapshot": [("mcp_dashboard", "core"), ("core", "data"), ("data", "pdfs")],
-    "generate_reports": [("mcp_dashboard", "reports"), ("reports", "data"), ("data", "pdfs")],
+    "get_dashboard_snapshot": [("mcp_dashboard", "core"), ("core", "data"), ("data", "sqlite")],
+    "generate_reports": [("mcp_dashboard", "reports"), ("reports", "data"), ("data", "sqlite")],
     "list_reference_pdfs": [("mcp_dashboard", "pdfs")],
     "get_reference_pdf": [("mcp_dashboard", "pdfs")],
-    "get_prices": [("mcp_data", "core"), ("core", "data")],
-    "get_cpi": [("mcp_data", "core"), ("core", "data")],
-    "calculate_index": [("mcp_data", "core"), ("core", "data")],
-    "get_city_rents": [("mcp_data", "core"), ("core", "data")],
+    "get_prices": [("mcp_data", "core"), ("core", "data"), ("data", "sqlite")],
+    "get_cpi": [("mcp_data", "core"), ("core", "data"), ("data", "sqlite")],
+    "calculate_index": [("mcp_data", "core"), ("core", "data"), ("data", "sqlite")],
+    "get_city_rents": [("mcp_data", "core"), ("core", "data"), ("data", "sqlite")],
     "ingest_reference_pdfs": [("mcp_storage", "data"), ("data", "pdfs"), ("mcp_storage", "sqlite")],
     "get_observations": [("mcp_storage", "sqlite")],
     "search_documents": [("mcp_vector", "embedding"), ("mcp_vector", "weaviate")],
@@ -89,13 +90,14 @@ TOOL_HOPS: dict[str, list[tuple[str, str]]] = {
 HOP_ACTION = {
     ("mcp_dashboard", "core"): "Index, VPI-Vergleich, Einflussfaktoren berechnen",
     ("mcp_data", "core"): "deterministische Berechnung",
-    ("core", "data"): "load_basket() – echte Daten (im Serverprozess gecacht)",
-    ("data", "pdfs"): "Tabellen deterministisch lesen + prüfen",
+    ("core", "data"): "load_basket() – validierter Datensatz (im Serverprozess gecacht)",
+    ("data", "sqlite"): "Datensatz aus SQLite lesen (read-only, gecacht pro Import)",
+    ("data", "pdfs"): "Import: Tabellen deterministisch lesen + prüfen",
     ("mcp_dashboard", "reports"): "generate_all()",
     ("reports", "data"): "Monatskosten, VPI, Stadtmieten",
     ("mcp_dashboard", "pdfs"): "Originaldatei lesen",
-    ("mcp_storage", "data"): "validierter PDF-Parser",
-    ("mcp_storage", "sqlite"): "SQL-Abfrage / Schreiben (Quelle + Seite)",
+    ("mcp_storage", "data"): "Import: validierter PDF-Parser (11 Prüfungen)",
+    ("mcp_storage", "sqlite"): "Import schreiben / Herkunft abfragen (Datei + Seite)",
     ("mcp_vector", "embedding"): "Suchanfrage / Textstellen einbetten",
     ("mcp_vector", "weaviate"): "Ähnlichkeitssuche (WeaviateVectorStore)",
     ("mcp_vector", "pdfs"): "Textstellen ohne Zahlentabellen",
@@ -202,7 +204,7 @@ def ui_tool_trace(tool: str, arguments: dict | None = None, duration_s: float | 
     steps.append(Step("ui", "user", "Fehler anzeigen" if error else "Ergebnis anzeigen", outcome, status))
     note = "Kein LLM: deterministische MCP-Tools über die Allow-List der Agent-API."
     if tool == "get_dashboard_snapshot":
-        note += " Ergebnis 90 s im UI gecacht (st.cache_data)."
+        note += " Zahlen aus SQLite (validierter Import); Ergebnis 90 s im UI gecacht (st.cache_data)."
     if tool == "search_documents":
         note += " Nur Kontext – Zahlen kommen nie aus der Vektorsuche."
     title = str((arguments or {}).get("query", "")) if tool == "search_documents" else action

@@ -1,5 +1,8 @@
 """Import of the real data in the reference PDFs (reports/real-data, "ECLI Modellrechnung").
 
+Used ONLY by the SQLite import (`storage.sqlite_store.persist_reference_pdfs`); at runtime the app reads the
+validated dataset from SQLite (`data.basket.load_basket`).
+
 The numbers are parsed DETERMINISTICALLY from the PDF tables (no LLM, no text search) and re-checked in code:
 
 - Referenzwarenkorb: fixed monthly base amount (EUR) per expenditure group, basis November 2024

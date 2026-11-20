@@ -9,8 +9,10 @@ baskets of goods and different weightings.
 
 > **Data:** the essential basket, the CPI (VPI) and the rents of the 15 largest cities are **real data** read
 > deterministically from the reference PDFs in `reports/real-data` (ECLI model calculation: Destatis EVS 2023
-> expenditure + official price indices, 11/2024–10/2026) and re-checked in code. There is **no synthetic demo
-> data**: without the reference PDFs the app shows an error instead of numbers. The sources contain no rent per
+> expenditure + official price indices, 11/2024–10/2026) and re-checked in code (11 checks), then
+> **imported into SQLite**. At runtime every figure is read from SQLite (`data_store/realbasket.sqlite3`); the PDFs
+> are only read by the import (`python -m real_basket.storage --mode sql`). There is **no synthetic demo data**:
+> without the import the app shows an error instead of numbers. The sources contain no rent per
 > federal state and no net salaries – these are reported as "not in the reference data", never estimated.
 > The UI is fully German.
 
@@ -45,7 +47,7 @@ wsl -d podman-machine-default -u root -- sh -c "podman rm -f realbasket-weaviate
 ```powershell
 (Invoke-WebRequest -UseBasicParsing http://127.0.0.1:8080/v1/.well-known/ready).StatusCode   # expect 200
 Get-Content .env | Where-Object { $_ -match '^\s*[A-Z_]+=' } | ForEach-Object { $k,$v = $_ -split '=',2; Set-Item "Env:$($k.Trim())" $v.Trim() }
-poetry run python -m real_basket.storage --mode sql
+poetry run python -m real_basket.storage --mode sql      # import: PDFs -> 11 checks -> SQLite (rerun after PDF changes)
 poetry run python -m real_basket.storage --mode vector   # once; the Weaviate volume keeps the index
 poetry run real-basket-mcp --transport streamable-http
 ```
@@ -77,6 +79,7 @@ Troubleshooting:
 | Symptom | Cause / fix |
 |---------|-------------|
 | `Agent API not reachable (http://127.0.0.1:8002)` | Window 3 not running |
+| `SQLite database ... not found` / `no validated dataset` | Import missing: `poetry run python -m real_basket.storage --mode sql` (window 2), then reload |
 | `machine not in running state` / `dial tcp 127.0.0.1:<port>` | Stale WSL relay holds the Podman ssh port: `wsl --shutdown`, restart window 1 |
 | `toomanyrequests: ... pull rate limit` | Docker Hub limit; use the `mirror.gcr.io/...` image as above |
 | Document search fails | Weaviate not ready or vector index missing: check window 1, rerun `--mode vector` |
@@ -104,7 +107,8 @@ Troubleshooting:
 | Feature | Description |
 |---------|-------------|
 | Essential living cost index | Weighted index of the 5 basket groups (Lebensmittel, Wohnen / Energie, Verkehr, Gesundheit, Kommunikation), base 11/2024 = 100, adjustable weights |
-| Real-data import | `data/real_data.py`: tables of the reference PDFs parsed without LLM, 11 re-checks (sums, gaps, printed ECLI and yearly rates recomputed by the engine, city rents, state coverage, …) |
+| Real-data import | `python -m real_basket.storage --mode sql` → `data/real_data.py`: tables of the reference PDFs parsed without LLM, 11 re-checks (sums, gaps, printed ECLI and yearly rates recomputed by the engine, city rents, state coverage, …) |
+| SQLite data store | `storage/sqlite_store.py`: **single read source** of all figures (dashboard, MCP tools, PDF reports, CLI). Validated dataset tables + provenance (`documents`, `observations` with file + page); an import is written in one transaction and only if all 11 checks pass |
 | CPI comparison | YoY rate of the essential index vs. official VPI, deviation in percentage points |
 | Deviation drivers | Exact contribution of every category to the deviation (`core/investigation.py`) |
 | City rents | 15 largest cities: real asking rents Jan vs. Oct 2026 (immowelt, from the reference PDF), incl. 75-m² flat |
@@ -154,9 +158,10 @@ src/real_basket/
 │   ├── llm.py           # OpenAI / Azure OpenAI provider
 │   └── settings.py      # .env based configuration
 ├── data/
-│   ├── real_data.py     # deterministic import + re-checks of the reference PDF tables
-│   └── basket.py        # load_basket(): real data only, raises RealDataError
+│   ├── real_data.py     # PDF table parser + 11 re-checks (used by the SQLite import only)
+│   └── basket.py        # load_basket(): validated dataset from SQLite, raises RealDataError
 ├── knowledge/       # RAG: ingest.py (passages), search.py (index, BM25 / embeddings, CLI)
+├── storage/         # sqlite_store.py (import + single read source), weaviate_store.py (vector index)
 ├── reports/pdf_report.py  # PDF generation (reportlab)
 ├── schemas/models.py
 ├── ui/app.py        # Streamlit dashboard
@@ -192,6 +197,9 @@ AZURE_COMPLETION_MODEL=gpt-4o
 ## Usage
 
 ```powershell
+# Import the reference PDFs into SQLite (required once and after every PDF change)
+poetry run python -m real_basket.storage --mode sql
+
 # Dashboard (http://localhost:8501)
 poetry run streamlit run src/real_basket/ui/app.py
 
@@ -229,7 +237,8 @@ AZURE_EMBEDDING_MODEL=text-embedding-3-large   # embedding deployment name (meth
 
 The sidebar shows the active provider (`Azure OpenAI · gpt-4o`). Provider selection lives in
 `src/real_basket/core/llm.py`.
-Without the reference PDFs the dashboard, the agent tools and the PDF reports stop with an error (no fallback).
+Without the SQLite import (`python -m real_basket.storage --mode sql`) the dashboard, the agent tools and the PDF
+reports stop with an error (no fallback, no implicit import).
 
 ### Dashboard tabs
 
@@ -291,7 +300,7 @@ objects, so the calculations stay unchanged.
 | Energy | Bundesnetzagentur, tariff comparison portals, Destatis energy sub-indices |
 | Mobility | Tankerkoenig fuel price API, public transport tariffs (Deutschlandticket) |
 
-- [x] Import the monthly tables of the reference PDFs (`reports/real-data`) as a data source, re-checked in code
+- [x] Import the monthly tables of the reference PDFs (`reports/real-data`) as a data source, re-checked in code and stored in SQLite (single read source)
 - [ ] Implement `fetch_official_cpi` with the Destatis GENESIS API (live updates beyond 10/2026)
 - [x] Generate the PDF reports from the real basket
 - [x] Remove the synthetic demo data (no fallback)
@@ -312,7 +321,7 @@ objects, so the calculations stay unchanged.
    every source and doc file must be UTF-8 without broken umlauts).
 4. Open a merge/pull request against `main`.
 
-Never commit `.env` or API keys. Generated PDFs (`/reports/*.pdf`) and the local index (`/data_store`) are
+Never commit `.env` or API keys. Generated PDFs (`/reports/*.pdf`) and the local index + SQLite database (`/data_store`) are
 git-ignored; the reference PDFs in `reports/real-data` are versioned (source of the real data).
 ## RealBasket v3: separat deployter Strands-Agent
 
@@ -320,7 +329,8 @@ Mit `docker compose up --build -d` starten vier Dienste:
 
 1. `realbasket-ui` (Streamlit 8501): reiner HTTP-Client zu `realbasket-agent`.
 2. `realbasket-agent` (FastAPI 8002, nur internes Docker-Netz): Strands-Orchestrator + MCP Gateway.
-3. `realbasket-mcp` (FastMCP 8001): kontrollierte Daten-/Berechnungstools und Original-PDF-Zugriff.
+3. `realbasket-mcp` (FastMCP 8001): kontrollierte Daten-/Berechnungstools; importiert beim Start die
+   Referenz-PDFs nach SQLite und liest alle Zahlen nur aus SQLite (PDFs nur für Import und Download).
 4. `weaviate` (8080/50051): semantischer PDF-Index.
 
 Details und Windows-Befehle unter [`docs/AGENT_SERVICE_V3.md`](docs/AGENT_SERVICE_V3.md).
@@ -332,7 +342,7 @@ nummerierten Kanten und als Schritttabelle (`src/real_basket/ui/monitoring.py`):
 
 | Vorgang | Pfad |
 |---------|------|
-| Dashboard / Referenz-PDF / Berichte | UI → Agent-API `/tools/{name}` (Allow-List) → MCP → Rechenkern / Daten / PDFs – kein LLM |
+| Dashboard / Referenz-PDF / Berichte | UI → Agent-API `/tools/{name}` (Allow-List) → MCP → Rechenkern → SQLite (Download: Original-PDF) – kein LLM |
 | Weaviate-Suche | UI → Agent-API → MCP → Embedding-Modell + Weaviate |
 | Chatfrage | UI → Agent-API `/chat` → Strands-Agent → LLM-Aufrufe und MCP-Tool-Aufrufe → Zahlen-Guardrail → UI |
 

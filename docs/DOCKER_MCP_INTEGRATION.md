@@ -20,8 +20,9 @@ flowchart TD
 Indexvisualisierung und Chat nutzen `real_basket.mcp_server.client.call_tool` bzw. den Strands MCPClient.
 Der MCP-Server ist die einzige Grenze zu Daten, Rechenfunktionen und Storage.
 
-**Besonderheit:** Der bisherige ECLI-Rechenkern verwendet weiterhin die validierten PDF-Tabellen
-als kanonische numerische Datenbasis. SQLite hält einen persistierten, quellenbezogenen Spiegel.
+**Datenbasis:** SQLite ist die einzige Lesequelle des ECLI-Rechenkerns. Die Referenz-PDFs werden nur beim
+Import gelesen (`python -m real_basket.storage --mode sql`, 11 Prüfungen); danach lesen Dashboard, MCP-Tools
+und Berichte ausschließlich den validierten Datensatz aus SQLite (inkl. Herkunft: Datei + Seite).
 Neu hochgeladene, anders aufgebaute PDFs (z. B. Nettogehälter) werden nicht stillschweigend akzeptiert.
 Sie benötigen einen eigenen Parser, Validierung und Rechenintegration.
 

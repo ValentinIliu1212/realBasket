@@ -1,6 +1,9 @@
-"""The essential basket: real data from the reference PDFs (reports/real-data, ECLI model calculation).
+"""The essential basket: the validated real dataset, read from SQLite.
 
-There is no synthetic fallback. If the PDFs are missing or cannot be parsed, `load_basket()` raises
+The reference PDFs (reports/real-data, ECLI model calculation) are read ONLY by the import
+(`python -m real_basket.storage --mode sql` -> `storage.sqlite_store.persist_reference_pdfs`, 11 checks).
+`load_basket()` reads the imported dataset from SQLite (`REALBASKET_SQLITE_PATH`). There is no synthetic
+fallback and no implicit import: if the database or the dataset is missing, `load_basket()` raises
 `RealDataError` and the dashboard / agent tools show that error instead of numbers.
 """
 
@@ -8,8 +11,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from real_basket.data.real_data import RealDataError, RealDataset, load_real_data
+from real_basket.data.real_data import RealDataError, RealDataset
 from real_basket.schemas.models import BasketWeights, Category, CpiPoint, PricePoint
+from real_basket.storage.sqlite_store import load_dataset
 
 __all__ = ["Basket", "RealDataError", "load_basket"]
 
@@ -38,7 +42,7 @@ class Basket:
 
 
 def load_basket() -> Basket:
-    """Parsed and re-checked reference basket (cached until a PDF changes). Raises RealDataError."""
-    ds = load_real_data()
+    """Validated reference basket from SQLite (cached per import). Raises RealDataError."""
+    ds = load_dataset()
     return Basket(real=ds, label="ECLI-Referenzwarenkorb (Destatis EVS 2023 + VPI), "
                                  f"{ds.periods[0]:%m/%Y}–{ds.periods[-1]:%m/%Y}")

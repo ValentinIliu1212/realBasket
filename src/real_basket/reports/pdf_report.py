@@ -1,10 +1,11 @@
-"""PDF-Berichte aus den echten Daten der Referenz-PDFs (reports/real-data, ECLI-Modellrechnung).
+"""PDF-Berichte aus dem SQLite-Datensatz (Import der Referenz-PDFs in reports/real-data, ECLI-Modellrechnung).
 
 - realbasket_preise_<Jahr>.pdf: modellierte Monatskosten je Ausgabengruppe (EUR/Monat), Summe, ECLI und VPI
 - realbasket_miete_staedte.pdf: Angebotsmieten der 15 größten Städte + Abdeckung je Bundesland
 - realbasket_verbraucherpreisindex.pdf: VPI vs. Grundlebenshaltungskosten-Index, Vorjahresraten, Datenprüfung
 
-Es gibt keine synthetischen Daten: fehlen die Referenz-PDFs, bricht die Erzeugung mit `RealDataError` ab.
+Es gibt keine synthetischen Daten: fehlt der importierte SQLite-Datensatz, bricht die Erzeugung mit
+`RealDataError` ab.
 
 Aufruf: poetry run real-basket-pdf [--out reports]
 """
@@ -76,7 +77,7 @@ def _table(rows: list[list[str]], widths: list[float], header: colors.Color = BL
 def _header(title: str, basket: Basket, styles) -> list:
     return [
         Paragraph(title, styles["Title"]),
-        Paragraph(f"Datenbasis: {basket.label} · echte Daten aus den Referenz-PDFs · Erstellt am "
+        Paragraph(f"Datenbasis: {basket.label} · echte Daten (SQLite, Import der Referenz-PDFs) · Erstellt am "
                   f"{date.today():%d.%m.%Y}", styles["Normal"]),
         Paragraph("Quellen: " + ", ".join(basket.real.documents), styles["Normal"]),
         Spacer(1, 0.4 * cm),
@@ -190,8 +191,9 @@ def generate_cpi_report(output_dir: str | Path = "reports", basket: Basket | Non
         PageBreak(),
         Paragraph(f"Datenprüfung: {sum(c.ok for c in ds.checks)} von {len(ds.checks)} Prüfungen bestanden",
                   styles["Heading2"]),
-        Paragraph("Die Zahlen werden deterministisch aus den Tabellen der Referenz-PDFs gelesen (kein LLM) und im "
-                  "Code nachgerechnet.", styles["Normal"]),
+        Paragraph("Die Zahlen werden beim Import deterministisch aus den Referenz-PDFs gelesen (kein LLM), "
+                  "im Code nachgerechnet und in SQLite gespeichert; die Berichte lesen nur aus SQLite.",
+                  styles["Normal"]),
         Spacer(1, 0.2 * cm),
         _table(check_rows, [2 * cm, 8 * cm, PAGE_W - 10 * cm], align_left=True),
     ]

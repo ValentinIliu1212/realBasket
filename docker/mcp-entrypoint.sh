@@ -1,7 +1,8 @@
 #!/bin/sh
 set -eu
 
-echo "[RealBasket] Importing validated PDF observations into persistent SQLite ..."
+# SQLite is the single read source of all figures; the PDFs are read only by this import (11 checks).
+echo "[RealBasket] Importing the validated reference PDFs into SQLite ..."
 python -m real_basket.storage --mode sql
 
 if [ "${REALBASKET_AUTO_INDEX_VECTOR:-false}" = "true" ]; then

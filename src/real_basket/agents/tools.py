@@ -1,8 +1,8 @@
 """Strands tools used by the RealBasket agents.
 
-All figures are real data parsed deterministically from the reference PDFs (reports/real-data, ECLI model
-calculation: Destatis EVS 2023 expenditure + official price indices, VPI; immowelt city rents) and re-checked in
-code. There is no synthetic data: if the PDFs are unavailable, every tool returns an `error` instead of numbers.
+All figures are real data read from the validated SQLite dataset, imported from the reference PDFs (ECLI model
+calculation: Destatis EVS 2023 expenditure + official price indices, VPI; immowelt city rents) and re-checked on
+import. There is no synthetic data: if the dataset is unavailable, every tool returns an `error` instead of numbers.
 
 Not contained in the sources (and therefore not offered): rents per federal state and net salaries.
 """
@@ -27,7 +27,7 @@ def _basket() -> tuple[Basket | None, dict | None]:
     try:
         return load_basket(), None
     except (RealDataError, OSError, ValueError) as exc:
-        return None, {"error": f"Echte Daten nicht verfügbar (Referenz-PDFs in reports/real-data): {exc}"}
+        return None, {"error": f"Echte Daten nicht verfügbar (SQLite-Import der Referenz-PDFs): {exc}"}
 
 
 def _basket_info(basket: Basket) -> dict:
