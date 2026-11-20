@@ -2,8 +2,9 @@
 
   architecture-detailed.md -> architecture-detailed.pdf
   architecture-summary.md  -> architecture-summary.pdf
+  architecture-summary-de.md -> architecture-summary-de.pdf   (German)
 
-Usage: poetry run python hackathon/build_pdf.py [detailed|summary]   (no argument: both)
+Usage: poetry run python hackathon/build_pdf.py [detailed|summary|summary-de]   (no argument: all)
 """
 
 from __future__ import annotations
@@ -31,12 +32,15 @@ from reportlab.platypus import (
 )
 
 HERE = Path(__file__).resolve().parent
-# name -> (source, output, page header, PDF title)
+# name -> (source, output, page header, PDF title, page label)
 DOCS = {
     "detailed": ("architecture-detailed.md", "architecture-detailed.pdf",
-                 "RealBasket – Detailed Architecture (MCP + Weaviate)", "RealBasket – Detailed Architecture"),
+                 "RealBasket – Detailed Architecture (MCP + Weaviate)", "RealBasket – Detailed Architecture", "Page"),
     "summary": ("architecture-summary.md", "architecture-summary.pdf",
-                "RealBasket – Architecture Summary (MCP + Weaviate)", "RealBasket – Architecture Summary"),
+                "RealBasket – Architecture Summary (MCP + Weaviate)", "RealBasket – Architecture Summary", "Page"),
+    "summary-de": ("architecture-summary-de.md", "architecture-summary-de.pdf",
+                   "RealBasket – Architektur-Zusammenfassung (MCP + Weaviate)",
+                   "RealBasket – Architektur-Zusammenfassung", "Seite"),
 }
 
 ACCENT = colors.HexColor("#1F4E79")
@@ -194,7 +198,7 @@ def parse(md: str, width: float) -> list:
     return story
 
 
-def page_decorator(header: str):
+def page_decorator(header: str, page_label: str = "Page"):
     def on_page(canvas, doc):
         canvas.saveState()
         canvas.setStrokeColor(ACCENT)
@@ -203,14 +207,14 @@ def page_decorator(header: str):
         canvas.setFont(BODY, 7.5)
         canvas.setFillColor(colors.grey)
         canvas.drawString(18 * mm, 289 * mm, header)
-        canvas.drawRightString(192 * mm, 10 * mm, f"Page {doc.page}")
+        canvas.drawRightString(192 * mm, 10 * mm, f"{page_label} {doc.page}")
         canvas.restoreState()
 
     return on_page
 
 
 def build(name: str) -> Path:
-    source, output, header, title = DOCS[name]
+    source, output, header, title, page_label = DOCS[name]
     out = HERE / output
     doc = SimpleDocTemplate(
         str(out), pagesize=A4, leftMargin=18 * mm, rightMargin=18 * mm,
@@ -218,7 +222,7 @@ def build(name: str) -> Path:
         title=title, author="RealBasket Team",
     )
     story = parse((HERE / source).read_text(encoding="utf-8"), doc.width)
-    on_page = page_decorator(header)
+    on_page = page_decorator(header, page_label)
     doc.build(story, onFirstPage=on_page, onLaterPages=on_page)
     return out
 
