@@ -202,7 +202,7 @@ with view_agent:
                 unverified = res.get("unverified", [])
                 if unverified:
                     check = "⚠️ Nicht durch Tool-Ergebnisse belegt (bitte prüfen): " + ", ".join(unverified)
-                record(mon.chat_trace(question, res.get("trace_messages") or mon.messages_from_tools(invoked),
+                record(mon.chat_trace(question, res.get("trace_messages", []),
                                       answer, unverified, res.get("figures_checked"), time.perf_counter() - t0))
             except Exception as exc:
                 answer, invoked = f"Agenten- oder MCP-Fehler: {exc}", []

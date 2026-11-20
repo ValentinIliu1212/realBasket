@@ -60,7 +60,6 @@ services:
         required: false
     environment:
       REALBASKET_MCP_URL: http://realbasket-mcp:8001/mcp
-      REALBASKET_AGENT_PORT: "8002"
     # Only the UI uses this internal API; no host port is published.
     expose:
       - "8002"

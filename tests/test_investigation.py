@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from real_basket.core.index import compare_with_cpi, essential_index
-from real_basket.core.investigation import deviation_breakdown, item_changes, regional_rent_changes
+from real_basket.core.investigation import deviation_breakdown, item_changes, state_rent_coverage
 from real_basket.data.basket import load_basket
 from real_basket.schemas.models import BasketWeights, Category
 
@@ -32,23 +32,10 @@ def test_breakdown_matches_index_for_custom_weights():
     assert {c["category"] for c in res["categories"]} == {"food", "housing_energy"}
 
 
-def test_item_and_region_drill_down():
+def test_item_changes_and_state_coverage():
     b = load_basket()
     items = item_changes(b.prices, "housing_energy")
     assert items and all("yoy_pct" in i for i in items)
-    cities = regional_rent_changes(b.real, "stadt")
-    assert cities["strongest"][0]["change_pct"] >= cities["weakest"][-1]["change_pct"]
-    states = regional_rent_changes(b.real, "bundesland")
-    assert states["verified_state_series"] is False and len(states["coverage"]) == 16
-    assert "strongest" not in states                     # no state rents are invented
-
-
-def test_investigate_tool_levels():
-    from real_basket.agents.tools import investigate_deviation
-
-    basket = load_basket()
-    res = investigate_deviation._tool_func("category")
-    assert res["categories"] and res["data_basis"] == basket.label
-    assert investigate_deviation._tool_func("item", basket.categories[0].value)["items"]
-    assert "error" in investigate_deviation._tool_func("item", "x")
-    assert "error" in investigate_deviation._tool_func("item", "rent")
+    states = state_rent_coverage(b.real)
+    assert len(states) == 16 and all(s["verified_state_series"] is False for s in states)
+    assert all("rent_eur_per_m2" not in s for s in states)              # no state rents are invented

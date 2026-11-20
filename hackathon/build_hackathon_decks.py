@@ -252,7 +252,7 @@ Zeit: 0:30.
 """},
             {"kind": "results", "title": "Zusammenfassung und nächste Schritte",
              "kpis": [("2,93 % vs. 2,83 %", "ECLI vs. VPI – Abweichung +0,11 PP"),
-                      ("138", "automatisierte Tests grün"),
+                      ("121", "automatisierte Tests grün"),
                       ("0", "Kennzahlen vom LLM – alle aus dem Rechenkern")],
              "done_head": "Was RealBasket zeigt", "done": [
                  "Grundbedarfsinflation auf echten Daten, erklärt nach Kategorien",
@@ -268,7 +268,7 @@ Zeit: 0:30.
                  "Vielen Dank – Fragen?"],
              "notes": """
 Zeit: 0:30.
-"Zusammengefasst: RealBasket misst die Inflation der Grundbedarfskosten auf echten Daten und erklärt die Abweichung zum VPI nach Kategorien. Der Agent wählt die Tools selbst, rechnet aber nie selbst. Der Guardrail prüft jede Zahl, RAG liefert Erklärungen mit Quelle, und das Monitoring macht jeden Schritt sichtbar – abgesichert durch 138 automatisierte Tests."
+"Zusammengefasst: RealBasket misst die Inflation der Grundbedarfskosten auf echten Daten und erklärt die Abweichung zum VPI nach Kategorien. Der Agent wählt die Tools selbst, rechnet aber nie selbst. Der Guardrail prüft jede Zahl, RAG liefert Erklärungen mit Quelle, und das Monitoring macht jeden Schritt sichtbar – abgesichert durch 121 automatisierte Tests."
 "Vielen Dank – wir freuen uns auf Ihre Fragen."
 Mögliche Fragen:
 - Warum nicht das LLM rechnen lassen? → Nachvollziehbarkeit und Korrektheit; LLMs halluzinieren Zahlen.
@@ -395,7 +395,7 @@ Time: 0:30.
 """},
             {"kind": "results", "title": "Summary and next steps",
              "kpis": [("2.93 % vs. 2.83 %", "ECLI vs. CPI – deviation +0.11 PP"),
-                      ("138", "automated tests passing"),
+                      ("121", "automated tests passing"),
                       ("0", "figures from the LLM – all from the calculation core")],
              "done_head": "What RealBasket shows", "done": [
                  "Essential-cost inflation on real data, explained by category",
@@ -411,7 +411,7 @@ Time: 0:30.
                  "Thank you – questions?"],
              "notes": """
 Time: 0:30.
-"In summary: RealBasket measures essential-cost inflation on real data and explains the deviation from the CPI by category. The agent picks the tools itself but never calculates itself. The guardrail checks every figure, RAG provides explanations with sources, and monitoring makes every step visible – backed by 138 automated tests."
+"In summary: RealBasket measures essential-cost inflation on real data and explains the deviation from the CPI by category. The agent picks the tools itself but never calculates itself. The guardrail checks every figure, RAG provides explanations with sources, and monitoring makes every step visible – backed by 121 automated tests."
 "Thank you – we look forward to your questions."
 Possible questions:
 - Why not let the LLM calculate? → Traceability and correctness; LLMs hallucinate numbers.

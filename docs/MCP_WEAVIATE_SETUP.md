@@ -18,7 +18,7 @@ poetry lock
 poetry install
 cp .env.example .env  # if no .env exists; configure OPENAI_API_KEY
 
-docker compose -f docker-compose.weaviate.yml up -d
+docker compose up -d weaviate
 poetry run python -m real_basket.storage --mode sql
 poetry run python -m real_basket.storage --mode vector
 poetry run real-basket-mcp --transport streamable-http
@@ -31,11 +31,7 @@ Or for stdio MCP clients:
 poetry run real-basket-mcp --transport stdio
 ```
 
-To try an existing Strands agent with MCP tools (requires a reachable model provider):
-
-```bash
-poetry run python -m real_basket.mcp_server.client_example
-```
+The chat agent that uses these tools is `mcp_server/agent.py` (`ask()`), served by the agent API (`uvicorn real_basket.agent_service.api:app --port 8002`, endpoint `POST /chat`).
 
 Example MCP tool calls: `ingest_reference_pdfs`, `index_pdf_knowledge`, `get_observations(category="Lebensmittel")`, `search_documents(query="Wohnen Energie")`, `get_prices(category="food")`, `get_cpi`, `get_city_rents`, `calculate_index`.
 
@@ -54,11 +50,11 @@ Example MCP tool calls: `ingest_reference_pdfs`, `index_pdf_knowledge`, `get_obs
 
 ```
 src/real_basket/mcp_server/server.py      MCP tool server
-src/real_basket/mcp_server/client_example.py  Agent using MCP client
+src/real_basket/mcp_server/agent.py      MCP chat agent (ask)
 src/real_basket/storage/sqlite_store.py   Financial observations + provenance
 src/real_basket/storage/weaviate_store.py  WeaviateVectorStore ingestion + query
 src/real_basket/storage/__main__.py       CLI ingestion
-Docker compose: docker-compose.weaviate.yml
+Docker compose: docker-compose.yml (service weaviate)
 Tests: tests/test_storage_mcp.py
 ```
 

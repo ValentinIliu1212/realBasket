@@ -27,7 +27,7 @@ The demo figures (hackathon deck) are ECLI **2,93 %** YoY vs. VPI **2,83 %**, a 
   - immowelt asking rents for the 15 largest cities (Jan vs. Oct 2026), including a 75 m² flat;
   - per federal state, either the covered cities or "Keine verifizierte Monatsreihe".
 - **There is no synthetic or demo data.** `load_basket()` raises `RealDataError` if the SQLite database or the imported dataset is missing (no fallback, no implicit import).
-- **Deliberately not provided, so never estimated:** rent per federal state, net salaries and live updates after 10/2026. `DESTATIS_GENESIS_TOKEN` is reserved but nothing uses it.
+- **Deliberately not provided, so never estimated:** rent per federal state, net salaries and live updates after 10/2026. A live Destatis GENESIS collector is on the roadmap.
 
 **The 11 import checks in `build_dataset()`** (an import is written to SQLite only if all of them pass):
 
@@ -78,17 +78,16 @@ The demo figures (hackathon deck) are ECLI **2,93 %** YoY vs. VPI **2,83 %**, a 
 
 | Package | Responsibility | Key symbols |
 |---|---|---|
-| `schemas/` | Domain types | `Category`, `CATEGORY_LABEL_DE`, `RegionType`, `PricePoint`, `CpiPoint`, `ComparisonPoint`, `BasketWeights` (validator: weights sum to 1) |
+| `schemas/` | Domain types | `Category`, `CATEGORY_LABEL_DE`, `RegionType`, `PricePoint`, `CpiPoint`, `BasketWeights` (validator: weights sum to 1) |
 | `data/` | PDF parser + checks (import only); basket from SQLite | `parse_document`, `build_dataset`, `RealDataset`, `Check`, `load_real_data` (import side); `load_basket` → `sqlite_store.load_dataset`, `Basket` |
 | `core/` | Math, settings, LLM config | `index.py`, `investigation.py`, `settings.py`, `llm.py` |
-| `knowledge/` | Chunker + local RAG | `ingest.py` (chunking), `search.py` (`KnowledgeBase`, BM25/embedding/RRF) |
+| `knowledge/` | PDF text chunker for Weaviate | `ingest.py` (`ingest_documents`; numeric cells dropped) |
 | `storage/` | Persistence; **SQLite = single read source** | `sqlite_store.py` (`persist_reference_pdfs`, `load_dataset`, `dataset_info`, `get_observations`), `weaviate_store.py`, `python -m real_basket.storage --mode sql\|vector\|all` |
-| `mcp_server/` | MCP tool server + MCP agent | `server.py` (FastMCP), `agent.py` (`ask`), `client.py` (`call_tool`), `client_example.py` |
+| `mcp_server/` | MCP tool server + MCP agent | `server.py` (FastMCP), `agent.py` (`ask`), `client.py` (`call_tool`) |
 | `agent_service/` | HTTP gateway v3 | `api.py` (FastAPI), `client.py` (httpx, used by the UI) |
-| `agents/` | Prompts, guardrail, trace, local tools | `prompts.py`, `guardrail.py`, `trace.py`, `tools.py`, `orchestrator.py` |
+| `agents/` | Model, guardrail, trace, data functions | `model.py` (`create_model`, `AzureOpenAIModel`), `guardrail.py`, `trace.py`, `prompts.py` (`DISCLAIMER`), `tools.py` (deterministic functions behind the MCP tools) |
 | `reports/` | German PDF reports | `generate_yearly_price_reports`, `generate_rent_report`, `generate_cpi_report`, `generate_all` |
 | `ui/` | Dashboard + monitoring | `app.py`, `monitoring.py` |
-| `cli.py` | Local CLI | `real-basket-cli` (local orchestrator, **not** via MCP) |
 
 ## 5. Deterministic Core
 
@@ -140,22 +139,19 @@ sum over c of gap_pp(c) = ECLI_YoY(t) - CPI_YoY(t)      (exact)
 - Creates a **new** Strands `Agent("REALBASKET-MCP-ORCHESTRATOR")` for every question, with `MCP_PROMPT` and `tools=client.list_tools_sync()`, i.e. all 12 tools.
 - Passes the last 8 history messages as plain text context.
 - Returns the answer, the invoked tool names and the raw `agent.messages`.
-- **Model:** Azure OpenAI (`AZURE_COMPLETION_MODEL`, e.g. `gpt-4o`) or OpenAI (`OPENAI_MODEL_ID`), temperature 0.2.
+- **Model:** `agents/model.create_model()` – Azure OpenAI (`AZURE_COMPLETION_MODEL`, e.g. `gpt-4o`) or OpenAI (`OPENAI_MODEL_ID`), temperature 0.2.
 
-### 7.2 Local orchestrator (`agents/orchestrator.py`) – used by the CLI
+### 7.2 Removed: local CLI orchestrator
 
-- `REALBASKET-ORCHESTRATOR` with in-process Strands tools: `collect_category_prices`, `fetch_official_cpi`, `calculate_essential_vs_cpi`, `fetch_regional_rents`, `investigate_deviation` and `search_methodology`.
-- `collect_category_prices` delegates to a `REALBASKET-COLLECTOR` **sub-agent** that has only `fetch_prices`.
-- `investigate_deviation` and `search_methodology` (local BM25/embedding RAG) exist **only** on this path, not in MCP.
+The former `real-basket-cli` path (`REALBASKET-ORCHESTRATOR` with a `REALBASKET-COLLECTOR` sub-agent, the tools `investigate_deviation` and `search_methodology` and a local BM25 index) was removed in 11/2026. `/chat` with the MCP agent is the only agent path.
 
-### 7.3 Prompt contract (`agents/prompts.py`)
+### 7.3 Prompt contract (`MCP_PROMPT` in `mcp_server/agent.py`)
 
-- Answer in German, with German number formatting and "Prozentpunkte".
-- Take numbers **only** from tools and never compute rates. Search results are context, never figures.
-- Never claim state rents or net salaries. ECLI costs are *modelled*; city rents are *asking* rents.
-- Cite passages as `[Datei S. N]`. Answer with a headline plus at most 5 bullets.
-- For *why* questions, start at category level, then drill down to item or region.
-- Always end with the `DISCLAIMER`: a deviation does not mean the VPI is wrong.
+- Always answer in German, with verifiable source references.
+- Numbers and calculations **only** from MCP tools; never invent figures. `get_dashboard_snapshot` gives the verified index results; `get_prices` and `get_observations` give the series.
+- `search_documents` gives method and source context from Weaviate only, never values.
+- Never claim regional net salaries or state rents. ECLI costs are *modelled*; city rents are *asking* rents.
+- Always end with the `DISCLAIMER` (`agents/prompts.py`): a deviation does not mean the VPI is wrong.
 
 ### 7.4 Number guardrail (`agents/guardrail.py`)
 
@@ -214,7 +210,7 @@ checks(position, name, ok, detail)
 - **City rents** are stored with category `Miete`, region "City, State", metric `asking_cold_rent`, `EUR/m2` and data_basis `published_asking_rent`, for months 2026-01 and 2026-10.
 - `get_observations`: parameterised filters, at most 10 000 rows.
 - **Read side:** `load_dataset()` opens SQLite **read-only**, rebuilds the `RealDataset` losslessly (tested: identical to the PDF import) and caches it per `import_id`, so a re-import is picked up without a restart.
-- **No PDF access at runtime:** dashboard, calculation tools, reports and CLI all go through `load_basket()` → SQLite (a test forbids any PDF read). A missing database raises `RealDataError` with the import command.
+- **No PDF access at runtime:** dashboard, calculation tools and reports all go through `load_basket()` → SQLite (a test forbids any PDF read). A missing database raises `RealDataError` with the import command.
 
 ### 9.2 Weaviate – methodology text search (`storage/weaviate_store.py`)
 
@@ -296,7 +292,7 @@ docker/mcp-entrypoint.sh
 
 - **Image:** `python:3.11-slim` with `pip install .`.
 - **Secrets:** `.env` is loaded at runtime through `env_file` and excluded from the image by `.dockerignore`.
-- **Weaviate on its own:** `docker-compose.weaviate.yml`.
+- **Weaviate on its own:** `docker compose up -d weaviate`.
 
 ### 12.2 Local development start (README, Windows + Podman)
 
@@ -317,8 +313,8 @@ Alternative: `docker compose up --build -d`.
 | `OPENAI_API_VERSION` | `2024-02-15-preview` |
 | `AZURE_COMPLETION_MODEL` / `AZURE_EMBEDDING_MODEL` | e.g. `gpt-4o` / `text-embedding-3-large` |
 | `OPENAI_API_KEY` / `OPENAI_MODEL_ID` | OpenAI path; `gpt-4o-mini`. Keep the key empty with Azure |
-| `KNOWLEDGE_DIR` / `DATA_DIR` | `reports/real-data` / `data_store` |
-| `KNOWLEDGE_RETRIEVER` / `KNOWLEDGE_TOP_K` | `auto` / 4 (local RAG) |
+| `KNOWLEDGE_DIR` | `reports/real-data` (read by the import and the Weaviate indexing) |
+| `EMBEDDING_MODEL_ID` | `text-embedding-3-small` (OpenAI embeddings when not on Azure) |
 | `MCP_HOST` / `MCP_PORT` | 127.0.0.1 / 8001 |
 | `REALBASKET_MCP_URL` | `http://127.0.0.1:8001/mcp` |
 | `REALBASKET_AGENT_URL` | `http://127.0.0.1:8002` |
@@ -339,7 +335,7 @@ Alternative: `docker compose up --build -d`.
 | `test_storage_mcp` | lossless SQLite round trip, no PDF read at runtime, missing-DB error, failed import keeps data, idempotency |
 | `test_calculation_consistency` | rates independent of `months` (fixed base) |
 | `test_real_data`, `test_index`, `test_investigation` | PDF import, index math, drivers |
-| `test_guardrail`, `test_knowledge`, `test_llm` | guardrail, RAG, provider selection |
+| `test_guardrail`, `test_knowledge`, `test_llm` | guardrail, PDF chunking (no figures), provider selection |
 | `test_monitoring`, `test_pdf_report`, `test_encoding` | traces, PDF output, UTF-8 / mojibake |
 
 ## 15. Security Posture

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from real_basket.agents.orchestrator import create_model
+from real_basket.agents.model import create_model
 from real_basket.agents.prompts import DISCLAIMER
 from real_basket.mcp_server.client import url
 

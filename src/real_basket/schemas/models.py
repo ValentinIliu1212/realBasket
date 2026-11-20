@@ -56,14 +56,3 @@ class CpiPoint(BaseModel):
     period: date
     index_value: float = Field(description="Official CPI index value (e.g. rebased Nov 2024 = 100)")
     source: str
-
-
-class ComparisonPoint(BaseModel):
-    period: date
-    essential_index: float
-    cpi_index: float
-    essential_yoy_pct: float | None = None
-    cpi_yoy_pct: float | None = None
-    deviation_pp: float | None = Field(
-        default=None, description="Essential YoY minus CPI YoY in percentage points"
-    )

@@ -32,9 +32,7 @@ ruff = "^0.6.0"
 python-pptx = "^1.0.2"
 
 [tool.poetry.scripts]
-real-basket-cli = "real_basket.cli:main"
 real-basket-pdf = "real_basket.reports.pdf_report:main"
-real-basket-knowledge = "real_basket.knowledge.search:main"
 real-basket-mcp = "real_basket.mcp_server.server:main"
 
 [tool.pytest.ini_options]

@@ -8,7 +8,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 
 def resolve_path(path: str | Path) -> Path:
-    """Relative paths (DATA_DIR, KNOWLEDGE_DIR, ...) are resolved against the current working directory if they
+    """Relative paths (KNOWLEDGE_DIR, REALBASKET_SQLITE_PATH, ...) are resolved against the current working directory if they
     exist there, otherwise against the project root - so `streamlit run` works from any folder."""
     p = Path(path)
     if p.is_absolute() or p.exists():
@@ -23,7 +23,6 @@ class Settings(BaseSettings):
 
     OPENAI_API_KEY: str = ""
     OPENAI_MODEL_ID: str = "gpt-4o-mini"
-    AGENT_NAME: str = "REALBASKET-ORCHESTRATOR"   # chat agent; the collector sub-agent is REALBASKET-COLLECTOR
 
     # --- Azure OpenAI (used when OPENAI_API_TYPE=azure; see real_basket.core.llm) ------------------
     OPENAI_API_TYPE: str = ""                  # "" / openai -> api.openai.com | azure -> Azure OpenAI
@@ -31,17 +30,10 @@ class Settings(BaseSettings):
     AZURE_OPENAI_ENDPOINT: str = ""            # e.g. https://<resource>.openai.azure.com/
     AZURE_OPENAI_API_KEY: str = ""             # falls back to OPENAI_API_KEY when empty
     AZURE_COMPLETION_MODEL: str = ""           # chat deployment name (falls back to OPENAI_MODEL_ID)
-    AZURE_EMBEDDING_MODEL: str = ""            # embedding deployment name (falls back to EMBEDDING_MODEL_ID)
+    # Embeddings (AZURE_EMBEDDING_MODEL / EMBEDDING_MODEL_ID) are read from the environment by storage/weaviate_store.py
 
-    DESTATIS_GENESIS_TOKEN: str = ""           # reserved for a live VPI collector (not used yet)
-
-    DATA_DIR: str = "data_store"               # local cache (method-note index)
-
-    # --- Reference documents: source of ALL figures (tables) and of the method notes (RAG) -----------
+    # --- Reference PDFs: read only by the SQLite import and the Weaviate indexing --------------------
     KNOWLEDGE_DIR: str = "reports/real-data"   # ECLI reference PDFs
-    KNOWLEDGE_RETRIEVER: str = "auto"          # bm25 | embedding | auto (embedding if OPENAI_API_KEY set)
-    EMBEDDING_MODEL_ID: str = "text-embedding-3-small"
-    KNOWLEDGE_TOP_K: int = 4                   # passages per search
 
 
 @lru_cache

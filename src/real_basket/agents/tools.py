@@ -1,4 +1,4 @@
-"""Strands tools used by the RealBasket agents.
+"""Deterministic data functions behind the MCP tools (`mcp_server/server.py`).
 
 All figures are real data read from the validated SQLite dataset, imported from the reference PDFs (ECLI model
 calculation: Destatis EVS 2023 expenditure + official price indices, VPI; immowelt city rents) and re-checked on
@@ -8,8 +8,6 @@ Not contained in the sources (and therefore not offered): rents per federal stat
 """
 
 from __future__ import annotations
-
-from strands import tool
 
 from real_basket.core.index import category_indices, compare_with_cpi, essential_index
 from real_basket.data.basket import Basket, RealDataError, load_basket
@@ -48,7 +46,6 @@ def _category_error(basket: Basket) -> dict:
     return {"error": f"category must be one of {[c.value for c in basket.categories]}", **_basket_info(basket)}
 
 
-@tool
 def fetch_regional_rents(region_type: str = "stadt") -> dict:
     """Fetch regional rents from the reference PDFs.
 
@@ -83,7 +80,6 @@ def fetch_regional_rents(region_type: str = "stadt") -> dict:
     return result
 
 
-@tool
 def fetch_prices(category: str, months: int = 24) -> dict:
     """Fetch the modelled monthly costs (EUR per month) of one expenditure group of the reference basket.
 
@@ -119,7 +115,6 @@ def fetch_prices(category: str, months: int = 24) -> dict:
             "prices": [p.model_dump(mode="json") for p in prices]}
 
 
-@tool
 def fetch_official_cpi(months: int = 24) -> dict:
     """Fetch the official Consumer Price Index (VPI, Destatis), rebased to November 2024 = 100.
 
@@ -132,61 +127,6 @@ def fetch_official_cpi(months: int = 24) -> dict:
     return {**_basket_info(basket), "cpi": [c.model_dump(mode="json") for c in _last_months(basket.cpi, months)]}
 
 
-@tool
-def investigate_deviation(level: str = "category", category: str = "", region_type: str = "stadt",
-                          months: int = 24) -> dict:
-    """Drill down into why essential inflation deviates from the CPI (deterministic, latest month).
-
-    Args:
-        level: 'category' (contribution and gap to CPI per group in pp), 'item' (YoY per item of `category`) or
-               'region' (city rents with strongest / weakest increase; 'bundesland' returns the coverage only)
-        category: an expenditure group (for level 'item')
-        region_type: 'stadt' or 'bundesland' (for level 'region')
-        months: months of history (>= 13); only limits the output - the calculation always uses the full series
-    """
-    from real_basket.core.investigation import deviation_breakdown, item_changes, regional_rent_changes
-
-    basket, err = _basket()
-    if err:
-        return err
-    level = level.lower()
-    if level == "region":
-        if region_type.lower() not in ("stadt", "bundesland"):
-            return {"error": "region_type must be 'stadt' or 'bundesland'"}
-        return {**regional_rent_changes(basket.real, region_type.lower()), "data_basis": basket.label}
-    if level == "item":
-        cat = _parse_category(basket, category)
-        if cat is None:
-            return _category_error(basket)
-        return {**_basket_info(basket), "category": cat.value, "items": item_changes(basket.prices, cat.value)}
-    # full series: slicing the prices first would move the base period and change the effective weights.
-    # The breakdown goes LAST: `_basket_info` also has a `categories` key (labels) that must not overwrite it.
-    return {**_basket_info(basket), **deviation_breakdown(basket.prices, basket.cpi, basket.weights)}
-
-
-@tool
-def search_methodology(query: str, year: int = 0) -> dict:
-    """Search method notes and caveats in the reference documents (German PDF reports on the ECLI model
-    calculation). Returns passages with file, page and section. Use for methodological questions, e.g. what
-    'Wohnen / Energie' contains, modelled vs. measured data, which federal states have verified rent series.
-    Never take figures from the passages.
-
-    Args:
-        query: search terms; German keywords work best (e.g. 'Nettokaltmiete Wohnen Energie')
-        year: only documents of this year (0 = all)
-    """
-    from real_basket.knowledge import KnowledgeBase
-
-    try:
-        res = KnowledgeBase().search(query, year=year or None)
-    except Exception as exc:  # noqa: BLE001 - the chat must keep working without documents
-        return {"error": f"Method-note search failed: {exc}"}
-    return {"query": query, "retriever": res["retriever"], "note": res["note"],
-            "passages": [{"cite": f"{p['source']} p. {p['page']}",
-                          **{k: p[k] for k in ("section", "text", "also_in")}} for p in res["passages"]]}
-
-
-@tool
 def calculate_essential_vs_cpi(weights: dict[str, float] | None = None, months: int = 24) -> dict:
     """Calculate the weighted essential living cost index and compare it with the official CPI (VPI).
 

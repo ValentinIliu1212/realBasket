@@ -70,11 +70,6 @@ def test_compact_messages_drop_large_payloads():
     assert msgs[1]["content"][0]["toolUse"]["name"] == "get_dashboard_snapshot"
 
 
-def test_fallback_without_trace_messages():
-    t = mon.chat_trace("x", mon.messages_from_tools(["get_prices", "calculate_index"]), "Antwort")
-    assert [s.detail.split("(")[0] for s in t.steps if s.action == "tools/call"] == ["get_prices", "calculate_index"]
-
-
 def test_unknown_and_prefixed_tool_names():
     assert mon.tool_name("realbasket_get_cpi") == "get_cpi"
     t = mon.chat_trace("x", _turn("does_not_exist"), "Antwort")

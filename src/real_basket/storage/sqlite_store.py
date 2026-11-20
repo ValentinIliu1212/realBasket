@@ -6,7 +6,7 @@ Import (`persist_reference_pdfs`, run by `python -m real_basket.storage --mode s
 
 - canonical dataset tables (`dataset_meta`, `dataset_documents`, `base_amounts`, `prices`, `cpi`,
   `printed_ecli`, `city_rents`, `state_coverage`, `checks`) - replaced on every import; read by
-  `load_dataset()` -> `data.basket.load_basket()` -> dashboard, MCP tools, PDF reports, CLI agent
+  `load_dataset()` -> `data.basket.load_basket()` -> dashboard, MCP tools, PDF reports
 - provenance tables (`documents`, `observations`) - one row per PDF version (sha256) and value, with page;
   queried by the MCP tool `get_observations`
 
@@ -78,7 +78,7 @@ _DATASET_TABLES = ('dataset_meta', 'dataset_documents', 'base_amounts', 'prices'
 
 
 def db_path() -> Path:
-    """`REALBASKET_SQLITE_PATH`; relative paths resolve like DATA_DIR / KNOWLEDGE_DIR (cwd, else project root)."""
+    """`REALBASKET_SQLITE_PATH`; relative paths resolve like KNOWLEDGE_DIR (cwd, else project root)."""
     return resolve_path(os.getenv('REALBASKET_SQLITE_PATH', DEFAULT_DB))
 
 

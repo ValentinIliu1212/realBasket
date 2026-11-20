@@ -255,14 +255,6 @@ def _tool_steps(use: dict, result: dict | None) -> list[Step]:
     return steps
 
 
-def messages_from_tools(tools: list[str]) -> list[dict]:
-    """Fallback if the agent service returns no `trace_messages`: one assistant message with all tool uses."""
-    uses = [{"toolUse": {"toolUseId": f"t{i}", "name": t, "input": {}}} for i, t in enumerate(tools)]
-    results = [{"toolResult": {"toolUseId": f"t{i}", "status": "success", "content": []}} for i in range(len(tools))]
-    return ([{"role": "assistant", "content": uses}, {"role": "user", "content": results}] if tools else []) + \
-        [{"role": "assistant", "content": [{"text": ""}]}]
-
-
 def chat_trace(question: str, messages: list, answer: str = "", unverified: list[str] | None = None,
                figures_checked: int | None = None, duration_s: float | None = None, error: str = "") -> Trace:
     """Use-case path of one chat turn. `messages` = the (compact) Strands messages of this turn."""

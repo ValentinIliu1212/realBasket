@@ -1,8 +1,4 @@
-"""Retrieval over unstructured reference documents (method notes, caveats) – the RAG part of RealBasket.
+"""Chunking of the reference PDFs into text passages (method notes, caveats) for the Weaviate index.
 
-Numbers never come from here: figures are taken from the deterministic calculation tools only.
+Numbers never come from here: numeric table cells are dropped; figures come from SQLite only.
 """
-
-from real_basket.knowledge.search import KnowledgeBase
-
-__all__ = ["KnowledgeBase"]

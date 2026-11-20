@@ -106,16 +106,16 @@ Troubleshooting:
 
 | Feature | Description |
 |---------|-------------|
-| Essential living cost index | Weighted index of the 5 basket groups (Lebensmittel, Wohnen / Energie, Verkehr, Gesundheit, Kommunikation), base 11/2024 = 100, adjustable weights |
+| Essential living cost index | Weighted index of the 5 basket groups (Lebensmittel, Wohnen / Energie, Verkehr, Gesundheit, Kommunikation), base 11/2024 = 100 |
 | Real-data import | `python -m real_basket.storage --mode sql` → `data/real_data.py`: tables of the reference PDFs parsed without LLM, 11 re-checks (sums, gaps, printed ECLI and yearly rates recomputed by the engine, city rents, state coverage, …) |
-| SQLite data store | `storage/sqlite_store.py`: **single read source** of all figures (dashboard, MCP tools, PDF reports, CLI). Validated dataset tables + provenance (`documents`, `observations` with file + page); an import is written in one transaction and only if all 11 checks pass |
+| SQLite data store | `storage/sqlite_store.py`: **single read source** of all figures (dashboard, MCP tools, PDF reports). Validated dataset tables + provenance (`documents`, `observations` with file + page); an import is written in one transaction and only if all 11 checks pass |
 | CPI comparison | YoY rate of the essential index vs. official VPI, deviation in percentage points |
 | Deviation drivers | Exact contribution of every category to the deviation (`core/investigation.py`) |
 | City rents | 15 largest cities: real asking rents Jan vs. Oct 2026 (immowelt, from the reference PDF), incl. 75-m² flat |
 | Coverage per federal state | 16 states: no verified state rent series in the sources; lists the cities with published rents |
 | PDF reports | One PDF per year + city rents + CPI report (German, EUR), generated from the real data |
-| AI agent | Strands chat agent that decides itself which tools to call; numbers only from deterministic tools; answers in German |
-| Method notes (RAG) | Search over method notes and caveats of reference PDFs (`reports/real-data`), cited with file + page. Context only – figures never come from text search |
+| AI agent | `REALBASKET-MCP-ORCHESTRATOR` (Strands) behind the agent API `/chat`: picks the MCP tools itself; numbers only from deterministic tools, checked by the number guardrail; answers in German |
+| PDF search (Weaviate) | Semantic search over method notes and caveats of the reference PDFs (MCP tool `search_documents`), cited with file + page. Context only – numeric table cells are not indexed |
 
 ## Architecture
 
@@ -126,51 +126,46 @@ Architecture slides in `docs/architecture/`:
 | Deck | Content | Rebuild |
 |------|---------|---------|
 | `RealBasket_Docker_Compose_DE.pptx` / `_EN.pptx` | **Current architecture** (4 slides each, NTT DATA template): cover, diagram `RealBasket-Architektur mit Docker Compose.png`, the four services and data flows, results and next steps | `poetry run python docs/architecture/build_docker_decks.py` (uses `docs/architecture/templates/agentic-ai-strands.pptx`) |
-| `RealBasket_Architektur_Ist.pptx` | earlier state (German) | `poetry run python docs/architecture/build_decks.py` |
-| `RealBasket_Architektur_Vorschlag_MCP_A2A.pptx` | target proposal with MCP servers and A2A agents (German) | same script |
 
 ```
-Streamlit UI / CLI ──► Orchestrator Agent REALBASKET-ORCHESTRATOR (LLM chooses the tools)
-                         ├─ calculate_essential_vs_cpi  ──► core/index.py          (deterministic)
-                         ├─ investigate_deviation       ──► core/investigation.py  (category → item → region)
-                         ├─ collect_category_prices     ──► Collector Agent ──► fetch_prices
-                         ├─ fetch_official_cpi / fetch_regional_rents (cities + state coverage)
-                         └─ search_methodology          ──► knowledge/ (RAG over reference PDFs)
+Streamlit UI ──HTTP──► Agent API (FastAPI :8002) ──MCP──► MCP server (FastMCP :8001)
+                        ├─ /tools/{name}: allow-list, no LLM         ├─► core/ (index, drivers) ──► SQLite (all figures)
+                        └─ /chat: REALBASKET-MCP-ORCHESTRATOR        └─► Weaviate (PDF text, context only)
+                           (Strands + Azure OpenAI) + number guardrail
 ```
 
-- **The agent decides** which tools a question needs and how deep to drill down ("why?" → category, then item
-  or region). **Code decides the numbers**: the LLM never calculates rates itself.
-- **RAG** (`src/real_basket/knowledge/`):
-  - *Ingest* (pypdf): prose paragraphs (method notes, caveats, data-quality hints) and the non-numeric cells of
-    tables become passages. Numeric cells are dropped on purpose; passages repeated across yearly reports are
-    stored once with all locations.
-  - *Search*: `bm25` (offline, German-aware: stemming, compounds such as Kaltmiete → Nettokaltmiete,
-    English → German glossary) or `embedding` (OpenAI, fused with BM25). `auto` = embedding if an API key is
-    set; embedding errors fall back to BM25. The index `data_store/knowledge/index.json` is rebuilt
-    automatically when the PDFs change.
+- **The agent decides** which MCP tools a question needs. **Code decides the numbers**: the LLM never
+  calculates rates itself, and the agent service flags every figure that no tool result backs.
+- **PDF search** (`knowledge/ingest.py` + `storage/weaviate_store.py`): prose paragraphs (method notes, caveats,
+  data-quality hints) and the non-numeric cells of tables become passages; numeric cells are dropped on purpose;
+  passages repeated across yearly reports are stored once with all locations. `python -m real_basket.storage
+  --mode vector` embeds them into Weaviate; the MCP tool `search_documents` queries them.
 
 ```
 src/real_basket/
-├── agents/          # orchestrator.py (chat agent + collector sub-agent), prompts.py, tools.py
+├── agent_service/   # api.py (FastAPI: /health, /chat, /tools/{name}), client.py (HTTP client of the UI)
+├── agents/          # model.py (create_model), guardrail.py, trace.py, prompts.py (disclaimer),
+│                    # tools.py (deterministic data functions behind the MCP tools)
 ├── core/
 │   ├── index.py         # essential index + CPI comparison
-│   ├── investigation.py # deviation drivers, drill-down by item / city, state coverage
+│   ├── investigation.py # deviation drivers, item changes, state coverage
 │   ├── llm.py           # OpenAI / Azure OpenAI provider
 │   └── settings.py      # .env based configuration
 ├── data/
 │   ├── real_data.py     # PDF table parser + 11 re-checks (used by the SQLite import only)
 │   └── basket.py        # load_basket(): validated dataset from SQLite, raises RealDataError
-├── knowledge/       # RAG: ingest.py (passages), search.py (index, BM25 / embeddings, CLI)
+├── knowledge/ingest.py  # PDF text passages for Weaviate (numeric cells dropped)
+├── mcp_server/      # server.py (12 MCP tools), agent.py (MCP chat agent), client.py (MCP client)
 ├── storage/         # sqlite_store.py (import + single read source), weaviate_store.py (vector index)
 ├── reports/pdf_report.py  # PDF generation (reportlab)
 ├── schemas/models.py
-├── ui/app.py        # Streamlit dashboard
-└── cli.py           # chat CLI
+└── ui/              # app.py (Streamlit dashboard), monitoring.py (use-case paths)
 ```
 
 ## Setup
 
-Requirements: Python ≥ 3.11, [Poetry](https://python-poetry.org/) ≥ 2.0, an OpenAI API key (only for the agent).
+Requirements: Python ≥ 3.11, [Poetry](https://python-poetry.org/) ≥ 2.0, Azure OpenAI (or OpenAI) access for the
+chat agent and the Weaviate embeddings.
 
 ```powershell
 git clone https://github.com/ValentinIliu1212/realBasket.git
@@ -200,29 +195,20 @@ AZURE_COMPLETION_MODEL=gpt-4o
 # Import the reference PDFs into SQLite (required once and after every PDF change)
 poetry run python -m real_basket.storage --mode sql
 
-# Dashboard (http://localhost:8501)
-poetry run streamlit run src/real_basket/ui/app.py
+# PDF text index in Weaviate (needs a running Weaviate and an embedding deployment)
+poetry run python -m real_basket.storage --mode vector
 
-# Ask the agent from the command line
-poetry run real-basket-cli "Are basic living costs rising faster than official inflation? Why?"
-poetry run real-basket-cli "In welchen Großstädten sind die Mieten am stärksten gestiegen?"
+# MCP server, agent API and dashboard: see the start sections above (windows 2-4)
 
 # PDF reports from the real data (written to ./reports, git-ignored)
 poetry run real-basket-pdf --out reports
-
-# Method notes of the reference PDFs (versioned in ./reports/real-data)
-poetry run real-basket-knowledge --rebuild
-poetry run real-basket-knowledge --query "Ist Wohnen / Energie die Nettokaltmiete?"
 ```
 
-Settings in `.env`: `OPENAI_API_KEY`, `OPENAI_MODEL_ID`,
-`KNOWLEDGE_DIR` (default `reports/real-data`; source of the real data and the method notes), `KNOWLEDGE_RETRIEVER` (`auto` | `bm25` | `embedding`),
-`EMBEDDING_MODEL_ID`, `KNOWLEDGE_TOP_K` (4). Relative paths are resolved against the project root if they do not
-exist in the current folder, and `.env` is read from the project root – so the app works from any folder.
-
-> **"0 Dokumente" in the method-notes tab?** Up to commit `cd9772a` the whole `/reports` folder was git-ignored,
-> so the reference PDFs never reached other machines. They are now versioned (`reports/real-data/*.pdf`):
-> `git pull` and restart Streamlit.
+Settings in `.env` / environment: the provider settings below, `KNOWLEDGE_DIR` (default `reports/real-data`; read
+by the import and the Weaviate indexing), `REALBASKET_SQLITE_PATH` (default `data_store/realbasket.sqlite3`),
+`REALBASKET_MCP_URL`, `REALBASKET_AGENT_URL`, `WEAVIATE_HOST` / `WEAVIATE_HTTP_PORT` / `WEAVIATE_GRPC_PORT`.
+Relative paths are resolved against the project root if they do not exist in the current folder, and `.env` is
+read from the project root.
 
 **Azure OpenAI** instead of api.openai.com (an Azure key sent to OpenAI fails with `401 Incorrect API key`):
 
@@ -232,11 +218,11 @@ OPENAI_API_VERSION=2024-02-15-preview
 AZURE_OPENAI_ENDPOINT=https://<resource>.openai.azure.com/
 AZURE_OPENAI_API_KEY=<key>
 AZURE_COMPLETION_MODEL=gpt-4o                  # chat deployment name
-AZURE_EMBEDDING_MODEL=text-embedding-3-large   # embedding deployment name (method-note search)
+AZURE_EMBEDDING_MODEL=text-embedding-3-large   # embedding deployment name (Weaviate PDF index)
 ```
 
-The sidebar shows the active provider (`Azure OpenAI · gpt-4o`). Provider selection lives in
-`src/real_basket/core/llm.py`.
+Provider selection lives in `src/real_basket/core/llm.py` (chat) and `src/real_basket/storage/weaviate_store.py`
+(embeddings).
 Without the SQLite import (`python -m real_basket.storage --mode sql`) the dashboard, the agent tools and the PDF
 reports stop with an error (no fallback, no implicit import).
 
@@ -292,7 +278,7 @@ objects, so the calculations stay unchanged.
 
 | Category | Candidate sources |
 |----------|-------------------|
-| CPI (official) | Destatis GENESIS API, table `61111-0002` (token in `.env`: `DESTATIS_GENESIS_TOKEN`), Eurostat HICP |
+| CPI (official) | Destatis GENESIS API, table `61111-0002` (needs a GENESIS API token), Eurostat HICP |
 | Food | Destatis sub-indices (food 01.1), supermarket price APIs / web scraping |
 | Rent | Destatis rent index, Mietspiegel data, rental portals |
 | Rent per state / largest cities | BBSR Angebotsmieten, Destatis Mietenindex per Bundesland, price atlases |

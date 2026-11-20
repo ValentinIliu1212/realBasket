@@ -1,6 +1,5 @@
-"""Deterministic drill-down used by the chat agent's `investigate_deviation` tool:
-category -> item -> region. The agent decides *whether* and *how deep* to drill down; the numbers come from here.
-All inputs are real data from the reference PDFs (reports/real-data)."""
+"""Deterministic deviation analysis: category drivers, item changes and the federal-state rent coverage.
+Used by the MCP tools and the dashboard snapshot; all inputs come from the validated SQLite dataset."""
 
 from __future__ import annotations
 
@@ -8,7 +7,7 @@ import pandas as pd
 
 from real_basket.core.index import category_indices, compare_with_cpi, essential_index
 from real_basket.data.real_data import RealDataset
-from real_basket.schemas.models import BasketWeights, CpiPoint, PricePoint, RegionType
+from real_basket.schemas.models import BasketWeights, CpiPoint, PricePoint
 
 STATE_NOTE = ("Die Referenzberichte enthalten bewusst keine Miete je Bundesland: Stadtwerte begründen keinen "
               "repräsentativen Mietwert für das gesamte Bundesland.")
@@ -68,15 +67,6 @@ def item_changes(prices: list[PricePoint], category: str) -> list[dict]:
     return sorted(result, key=lambda d: -abs(d["yoy_pct"]))
 
 
-def city_rent_changes(ds: RealDataset, top: int = 5) -> dict:
-    """Published asking rents of the 15 largest cities (reference PDF, immowelt), Jan vs. Oct 2026."""
-    changes = sorted(({"region": c["city"], "bundesland": c["state"], "rent_eur_per_m2": c["rent_oct_eur_m2"],
-                       "change_pct": c["change_pct"]} for c in ds.city_rents), key=lambda d: -d["change_pct"])
-    return {"region_type": RegionType.CITY.value, "change": "Okt 2026 vs. Jan 2026 (Angebotskaltmiete)",
-            "strongest": changes[:top], "weakest": changes[-top:],
-            "source": ds.city_rents[0]["source"] if ds.city_rents else None}
-
-
 def state_rent_coverage(ds: RealDataset) -> list[dict]:
     """Per federal state: no verified rent series; the cities of that state with published rents (if any)."""
     by_city = {c["city"]: c for c in ds.city_rents}
@@ -84,11 +74,3 @@ def state_rent_coverage(ds: RealDataset) -> list[dict]:
              "cities": [{"city": name, "rent_eur_per_m2": by_city[name]["rent_oct_eur_m2"],
                          "change_pct": by_city[name]["change_pct"]} for name in s["cities"] if name in by_city],
              "source": s["source"]} for s in ds.state_coverage]
-
-
-def regional_rent_changes(ds: RealDataset, region_type: str = "stadt", top: int = 5) -> dict:
-    """Cities: strongest / weakest rent increase. Federal states: coverage only (no state rents in the sources)."""
-    if RegionType(region_type) == RegionType.STATE:
-        return {"region_type": RegionType.STATE.value, "verified_state_series": False, "note": STATE_NOTE,
-                "coverage": state_rent_coverage(ds)}
-    return city_rent_changes(ds, top)

@@ -76,7 +76,7 @@ def test_default_weights_are_exact_expenditure_shares():
     from real_basket.agents.tools import calculate_essential_vs_cpi
 
     ds = load_real_data(REAL_DOCS)
-    res = calculate_essential_vs_cpi._tool_func()
+    res = calculate_essential_vs_cpi()
     for cat, amount in ds.base_amounts.items():
         assert res["weights"][cat.value] == round(amount / ds.base_total, 4)
     printed_yoy = ds.printed_ecli_yoy[max(ds.printed_ecli_yoy)]
@@ -87,13 +87,13 @@ def test_default_weights_are_exact_expenditure_shares():
 def test_tools_use_real_data_only():
     from real_basket.agents import tools
 
-    res = tools.calculate_essential_vs_cpi._tool_func()
+    res = tools.calculate_essential_vs_cpi()
     assert "housing_energy" in res["weights"] and res["documents"]
-    custom = tools.calculate_essential_vs_cpi._tool_func(weights={"food": 1, "mobility": 1})
+    custom = tools.calculate_essential_vs_cpi(weights={"food": 1, "mobility": 1})
     assert custom["weights"] == {"food": 0.5, "mobility": 0.5}
-    assert "error" in tools.fetch_prices._tool_func("rent")
-    assert tools.fetch_prices._tool_func("health")["prices"]
-    rents = tools.fetch_regional_rents._tool_func(region_type="all")
+    assert "error" in tools.fetch_prices("rent")
+    assert tools.fetch_prices("health")["prices"]
+    rents = tools.fetch_regional_rents(region_type="all")
     assert len(rents["cities"]) == 15 and len(rents["states"]) == 16
     assert all("rent_eur_per_m2" not in s for s in rents["states"])
     assert not hasattr(tools, "fetch_net_salaries")

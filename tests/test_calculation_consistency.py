@@ -25,7 +25,7 @@ def test_index_tool_matches_dashboard_for_every_window(months):
 
     b = load_basket()
     full = compare_with_cpi(essential_index(b.prices, b.weights), b.cpi).dropna().iloc[-1]
-    res = calculate_essential_vs_cpi._tool_func(months=months)
+    res = calculate_essential_vs_cpi(months=months)
     assert res["essential_yoy_pct"] == round(float(full["essential_yoy_pct"]), 2)
     assert res["cpi_yoy_pct"] == round(float(full["cpi_yoy_pct"]), 2)
     assert res["deviation_pp"] == round(float(full["deviation_pp"]), 2)
@@ -35,24 +35,10 @@ def test_index_tool_matches_dashboard_for_every_window(months):
 
 
 @needs_docs
-@pytest.mark.parametrize("months", [13, 24])
-def test_investigate_matches_dashboard_snapshot(months):
-    from real_basket.agents.tools import investigate_deviation
-    from real_basket.core.investigation import deviation_breakdown
-    from real_basket.data.basket import load_basket
-
-    b = load_basket()
-    dashboard = deviation_breakdown(b.prices, b.cpi, b.weights)
-    res = investigate_deviation._tool_func("category", months=months)
-    assert res["deviation_pp"] == dashboard["deviation_pp"]
-    assert res["categories"] == dashboard["categories"]
-
-
-@needs_docs
 def test_prices_tool_returns_deterministic_summary():
     from real_basket.agents.tools import fetch_prices
 
-    res = fetch_prices._tool_func("food", months=24)
+    res = fetch_prices("food", months=24)
     summary = res["summary"][0]
     assert {"first_value", "last_value", "change_pct", "yoy_pct_latest"} <= set(summary)
     assert summary["change_pct"] == round((summary["last_value"] / summary["first_value"] - 1) * 100, 2)
