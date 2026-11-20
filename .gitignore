@@ -11,3 +11,8 @@ sessions/
 /reports/*
 !/reports/real-data/
 /data_store/
+# Eclipse project settings (local only)
+.settings/
+.project
+.classpath
+.metadata/
