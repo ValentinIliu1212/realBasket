@@ -1,11 +1,15 @@
-"""Render architecture-detailed.md (Markdown subset) to PDF with reportlab.
+"""Render the hackathon architecture documents (Markdown subset) to PDF with reportlab.
 
-Usage: poetry run python hackathon/build_pdf.py
+  architecture-detailed.md -> architecture-detailed.pdf
+  architecture-summary.md  -> architecture-summary.pdf
+
+Usage: poetry run python hackathon/build_pdf.py [detailed|summary]   (no argument: both)
 """
 
 from __future__ import annotations
 
 import re
+import sys
 from pathlib import Path
 
 from reportlab.lib import colors
@@ -27,8 +31,13 @@ from reportlab.platypus import (
 )
 
 HERE = Path(__file__).resolve().parent
-SRC = HERE / "architecture-detailed.md"
-OUT = HERE / "architecture-detailed.pdf"
+# name -> (source, output, page header, PDF title)
+DOCS = {
+    "detailed": ("architecture-detailed.md", "architecture-detailed.pdf",
+                 "RealBasket – Detailed Architecture (MCP + Weaviate)", "RealBasket – Detailed Architecture"),
+    "summary": ("architecture-summary.md", "architecture-summary.pdf",
+                "RealBasket – Architecture Summary (MCP + Weaviate)", "RealBasket – Architecture Summary"),
+}
 
 ACCENT = colors.HexColor("#1F4E79")
 LIGHT = colors.HexColor("#EAF1F8")
@@ -185,28 +194,43 @@ def parse(md: str, width: float) -> list:
     return story
 
 
-def on_page(canvas, doc):
-    canvas.saveState()
-    canvas.setStrokeColor(ACCENT)
-    canvas.setLineWidth(0.6)
-    canvas.line(18 * mm, 287 * mm, 192 * mm, 287 * mm)
-    canvas.setFont(BODY, 7.5)
-    canvas.setFillColor(colors.grey)
-    canvas.drawString(18 * mm, 289 * mm, "RealBasket – Detailed Architecture (MCP + Weaviate)")
-    canvas.drawRightString(192 * mm, 10 * mm, f"Page {doc.page}")
-    canvas.restoreState()
+def page_decorator(header: str):
+    def on_page(canvas, doc):
+        canvas.saveState()
+        canvas.setStrokeColor(ACCENT)
+        canvas.setLineWidth(0.6)
+        canvas.line(18 * mm, 287 * mm, 192 * mm, 287 * mm)
+        canvas.setFont(BODY, 7.5)
+        canvas.setFillColor(colors.grey)
+        canvas.drawString(18 * mm, 289 * mm, header)
+        canvas.drawRightString(192 * mm, 10 * mm, f"Page {doc.page}")
+        canvas.restoreState()
+
+    return on_page
 
 
-def main() -> None:
+def build(name: str) -> Path:
+    source, output, header, title = DOCS[name]
+    out = HERE / output
     doc = SimpleDocTemplate(
-        str(OUT), pagesize=A4, leftMargin=18 * mm, rightMargin=18 * mm,
+        str(out), pagesize=A4, leftMargin=18 * mm, rightMargin=18 * mm,
         topMargin=16 * mm, bottomMargin=16 * mm,
-        title="RealBasket – Detailed Architecture", author="RealBasket Team",
+        title=title, author="RealBasket Team",
     )
-    story = parse(SRC.read_text(encoding="utf-8"), doc.width)
+    story = parse((HERE / source).read_text(encoding="utf-8"), doc.width)
+    on_page = page_decorator(header)
     doc.build(story, onFirstPage=on_page, onLaterPages=on_page)
-    print(f"written: {OUT}")
+    return out
+
+
+def main(argv: list[str]) -> None:
+    names = argv or list(DOCS)
+    unknown = [n for n in names if n not in DOCS]
+    if unknown:
+        raise SystemExit(f"unknown document(s): {', '.join(unknown)} - choose from {', '.join(DOCS)}")
+    for name in names:
+        print(f"written: {build(name)}")
 
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv[1:])
